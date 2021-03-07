@@ -19,10 +19,10 @@ class MyLine:
         self.p0 = np.array(p0)
         self.p1 = np.array(p1)
         self.isSegment = isSegment
-        
+        self.length = np.linalg.norm(self.p1 - self.p0)
         
         # Normalized direction vec from p0 to p1
-        self.dir = (self.p1 - self.p0)/np.linalg.norm(self.p1 - self.p0)
+        self.dir = (self.p1 - self.p0)/self.length
         
         
     # Math here basically came from setting up an augmented matrix
@@ -110,6 +110,34 @@ class Scene:
         # full "lines", not "segments".
         self.lines.append(MyLine(p0, p1, False))
         
+    def calcFreeLines(self):
+        for i in range(len(self.vertices)):
+            for j in range(len(self.vertices)):
+                if i == j:
+                    continue
+                candidate = MyLine(self.vertices[i], self.vertices[j], False)
+                intersectsObj = False
+                
+                polygonCount = 0
+                while polygonCount < len(self.polygons) and not intersectsObj:
+                    obj = self.polygons[polygonCount]
+                    pts = obj.exterior.coords
+                    numPts = len(pts)
+                    edgeNum = 0
+                    while edgeNum < numPts-1 and not intersectsObj:
+                        edgeLine = MyLine(pts[edgeNum], pts[(edgeNum+1)], True)
+                        intersection = candidate.intersection(edgeLine)
+                        # Threshold because active lines that just touch vertices are okay.
+                        threshold = 0.0001
+                        if intersection.doMeet and intersection.meetS > threshold and intersection.meetS < edgeLine.length - threshold:
+                            # Also, a threshold for lines tangent to another edge on the surface
+                            dot = candidate.dir[0] * edgeLine.dir[0] + candidate.dir[1] * edgeLine.dir[1]
+                            if abs(dot) < (1.0 - threshold):
+                                intersectsObj = True
+                        edgeNum += 1
+                    polygonCount += 1
+                if not intersectsObj:
+                    self.addLine(self.vertices[i], self.vertices[j])
     
     def drawScene(self):
         # Plot all polygons.
@@ -131,10 +159,12 @@ class Scene:
             # We don't know, in each direction, if we'll hit a vertical
             # or horizontal border first, so we have to test both
             # x and y. 
-            forwardXHit = self.maxX
-            forwardYHit = self.maxY
-            backwardXHit = self.minX
-            backwardYHit = self.minY
+            borderX = 0.1*(self.maxX - self.minX)
+            borderY = 0.1*(self.maxY - self.minY)
+            forwardXHit = self.maxX + borderX
+            forwardYHit = self.maxY + borderY
+            backwardXHit = self.minX - borderX
+            backwardYHit = self.minY -borderY
             # If the direction vector has a negative component,
             # then "forward" along it points to the min borders, not max ones.
             if ln.dir[0] < 0:
@@ -162,7 +192,7 @@ class Scene:
             # Line is drawn
             plt.plot([newP0[0], newP1[0]], [newP0[1], newP1[1]], "g")
             
-        intersections = np.empty((0,2))
+        '''intersections = np.empty((0,2))
         for ln in self.lines:
             for obj in self.polygons:
                 pts = obj.exterior.coords
@@ -170,10 +200,10 @@ class Scene:
                 for i in range(numPts-1):
                     edgeLine = MyLine(pts[i], pts[(i+1)], True)
                     intersection = ln.intersection(edgeLine)
-                    if intersection.doMeet:
-                        intersections = np.append(intersections, [intersection.meetPt], axis=0)
+                    if intersection.doMeet and intersection.meetS > 0 and intersection.meetS < edgeLine.length:
+                        intersections = np.append(intersections, [intersection.meetPt], axis=0)'''
                         
-        plt.plot(intersections[:, 0], intersections[:, 1], 'bo')
+        #plt.plot(intersections[:, 0], intersections[:, 1], 'bo')
         plt.show()
 
 #def sortedPoints(pts):
@@ -181,15 +211,21 @@ class Scene:
     
 world = Scene()
 
-polygon1 = [(0,3),(1,1),(3,0),(4,0),(3,4)]
+polygon1 = [(0, 0), (2.25, 0.5), (1.25, 2.3)] #[(0,3),(1,1),(3,0),(4,0),(3,4)]
 
 world.addPolygon(polygon1)
 
-polygon2 = [(1,4),(2,5),(2,1),(1,3)]
+polygon2 = [(1.15, 3.15), (4, 4), (0.9, 5.25)]#[(1,4),(2,5),(2,1),(1,3)]
+
+polygon3 = [(3, 0.7), (4.85, 1.75), (4.85, 3.4)]#[(1,4),(2,5),(2,1),(1,3)]
 
 world.addPolygon(polygon2)
 
-world.addLine((0, 2.5), (3, 2.5))
+world.addPolygon(polygon3)
+
+#world.addLine((0, 2.5), (3, 2.5))
+
+world.calcFreeLines()
 
 
 world.drawScene()
