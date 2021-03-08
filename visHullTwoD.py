@@ -72,10 +72,13 @@ class Scene:
 
         self.lines = []
         
-        
         # In addition to keeping track of individual polygons,
         # we also keep track of ALL vertices in the scene.
         self.vertices = np.empty((0, 2))
+        # These can maybe be combined with self.vertices into a dataframe or something
+        self.prevIndices = np.empty(0, dtype=np.int)
+        self.nextIndices = np.empty(0, dtype=np.int)
+        self.polygonIndices = np.empty(0, dtype=np.int)
         
         # Boundaries for the scene.
         self.minX = math.inf
@@ -144,6 +147,17 @@ class Scene:
         if newMaxY > self. maxY:
             self.maxY = newMaxY
             
+        # Update the prevIndices and newIndices lists
+        startIndex = self.vertices.shape[0]
+        newPrevIndices = np.roll(np.arange(startIndex, startIndex + newVertices.shape[0]), 1, axis=0)
+        newNextIndices = np.roll(np.arange(startIndex, startIndex + newVertices.shape[0]), -1, axis=0)
+        self.prevIndices = np.concatenate((self.prevIndices, newPrevIndices))
+        self.nextIndices = np.concatenate((self.nextIndices, newNextIndices))
+        
+        # Update the polygonIndices list
+        self.polygonIndices = np.concatenate((self.polygonIndices, np.full(newVertices.shape[0], len(self.polygons) - 1)))
+        
+
         # Once that is done, update the vertices list.
         self.vertices = np.concatenate((self.vertices, newVertices))
         
@@ -154,18 +168,22 @@ class Scene:
         
     def calcFreeLines(self):
         for i in range(len(self.vertices)):
-            for j in range(len(self.vertices)):
-                if i == j:
+            if self.isVertexConcave(i):
+                continue
+            for j in range(i+1, len(self.vertices)):
+                if self.isVertexConcave(j):
                     continue
                 candidate = MyLine(self.vertices[i], self.vertices[j], False)
                 intersectsObj = False
                 
                 polygonCount = 0
+                vertCount = 0 # Vertex index of start of current edge analyzed
                 while polygonCount < len(self.polygons) and not intersectsObj:
                     obj = self.polygons[polygonCount]
                     pts = obj.exterior.coords
                     numPts = len(pts)
-                    edgeNum = 0
+                    edgeNum = 0 # Like vertCount, but just for this polygon rather than whole scene.
+                    
                     # pts, i.e. obj.exterior.coords, is organized where the 1st vertex is repeated at the end.
                     # Therefore, for the edge between the 1st and last vertices,
                     # we don't need to cycle around with a (n + 1)%numPts or anything.
@@ -185,33 +203,36 @@ class Scene:
                             # Infinite intersections are already "discarded" by the intersection() function.
                             # But we need to rule out intersections with a vertex that do not pierce the shape,
                             # because these are fine (in fact, they are REQUIRED for the algorithm).
-                            # We first deal with the line intersecting the vertex at the start of its edge.
+                            # We first deal with the line intersecting the vertex at the start of its edge, at v0.
                             if (abs(intersection.meetS) < EQUAL_THRESHOLD):
-                                # Get the vertex before v0 and v1
-                                # numPts-2 is justified by pts structure described above.
-                                prevIndex = (edgeNum - 1) if edgeNum > 0 else numPts - 2
-                                vPrev = np.array(pts[prevIndex])
                                 # Test if candidate.dir is between both edge dirs going AWAY from v0
-                                intersectsThisTime = self.isLineInsideEdgeAngle(vPrev - v0, edgeLine.dir, candidate.dir)
+                                intersectsThisTime = self.isLineInsideEdgeAngle(vertCount, candidate.dir)
                             # Same idea, but for the case where the intersection is at
                             # the other side of the edge, closer to v1
                             elif (abs(intersection.meetS - edgeLine.length) < EQUAL_THRESHOLD):
-                                # Get the vertex after v1
-                                # Logic here is justified by pts structure described above.
-                                nextIndex = (edgeNum + 2) if (edgeNum + 2) < numPts else 1
-                                vNext = np.array(pts[nextIndex])
                                 # Test if candidate.dir is between both edge dirs going AWAY from v1
-                                intersectsThisTime = self.isLineInsideEdgeAngle(vNext - v1, -edgeLine.dir, candidate.dir)
+                                intersectsThisTime = self.isLineInsideEdgeAngle(self.nextIndices[vertCount], candidate.dir)
                             
+                           
                             intersectsObj = (intersectsObj or intersectsThisTime)
                             
                         edgeNum += 1
+                        vertCount += 1
                     polygonCount += 1
                 if not intersectsObj:
                     self.addLine(self.vertices[i], self.vertices[j])
                     
                     
-    def isLineInsideEdgeAngle(self, dir0, dir1, dirToTest):
+    def isLineInsideEdgeAngle(self, vertIndex, dirToTest):
+        if self.isVertexConcave(vertIndex):
+            return True
+
+        v0 = self.vertices[self.prevIndices[vertIndex]]
+        v1 = self.vertices[vertIndex]
+        v2 = self.vertices[self.nextIndices[vertIndex]]
+        
+        dir0 = v0 - v1
+        dir1 = v2 - v1
         # Make sure both dirs are normalized
         length0 = np.linalg.norm(dir0)
         length1 = np.linalg.norm(dir1)
@@ -233,7 +254,11 @@ class Scene:
     
     # Take in vertices v0, v1, v2 and whether mesh is counter-clockwise (ccw).
     # Output whether v1 is a concave vertex.
-    def isVertexConcave(self, v0, v1, v2, cw):
+    def isVertexConcave(self, vertIndex):
+        v0 = self.vertices[self.prevIndices[vertIndex]]
+        v1 = self.vertices[vertIndex]
+        v2 = self.vertices[self.nextIndices[vertIndex]]
+        cw = self.cwList[self.polygonIndices[vertIndex]]
         
         # Construct a local coordinate frame.
         # The "up" vector will be v2 - v1.
@@ -258,10 +283,6 @@ class Scene:
         if (backVec[0] > 0 and not cw) or (backVec[0] < 0 and cw):
             return True
         return False
-        
-        
-        
-        
     
     def drawScene(self):
         print("cwList:", self.cwList)
@@ -319,17 +340,11 @@ class Scene:
             
         convex = []
         concave = []
-        for i in range(len(self.polygons)):
-            cw = self.cwList[i]
-            
-            pVerts = np.array(self.polygons[i].exterior)[:-1, :]
-            nextVerts = np.roll(pVerts, -1, axis=0)
-            prevVerts = np.roll(pVerts, 1, axis=0)
-            for j in range(pVerts.shape[0]):
-                if self.isVertexConcave(prevVerts[j], pVerts[j], nextVerts[j], cw):
-                    concave.append(pVerts[j])
-                else:
-                    convex.append(pVerts[j])
+        for i in range(self.vertices.shape[0]):
+            if self.isVertexConcave(i):
+                concave.append(self.vertices[i])
+            else:
+                convex.append(self.vertices[i])
         npConvex = np.array(convex)
         npConcave = np.array(concave)
         if npConvex.shape[0] > 0:
@@ -378,3 +393,18 @@ reminders = [
 for reminder in reminders:
     sep = "==========="
     print("\n" + sep + "\n" + reminder + "\n" + sep + "\n")
+    
+# temp1 = np.array(polygon1)
+# temp2 = np.roll(np.arange(5, 5+temp1.shape[0]), -1, axis=0)
+# temp3 = np.roll(np.arange(5, 5+temp1.shape[0]), 1, axis=0)
+# ...
+# testVertices = np.empty((temp1.shape[0]), dtype=[("x", np.float64), ("y", np.float64), ("prevIndex", np.int), ("nextIndex", np.int)])
+# testVertices["x"] = temp1[:, 0]
+# testVertices["y"] = temp1[:, 1]
+# testVertices["prevIndex"] = temp2
+# testVertices["nextIndex"] = temp3
+# testVertices[3]["x"]
+# testVertices[["x", "y"]]
+# testVertices[0][["x", "y"]]
+# Does not work: np.dot(testVertices[2][["x", "y"]], testVertices[3][["x", "y"]])
+# The error msg: Can't cast from structure to non-structure, except if the structure only has a single field.
