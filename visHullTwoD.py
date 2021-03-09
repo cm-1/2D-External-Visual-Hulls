@@ -3,8 +3,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 import math
+from enum import Enum
+
 
 EQUAL_THRESHOLD = 0.0001 # Threshold for considering certain fp numbers equal below.
+
+class SegmentType(Enum):
+    A = 1
+    B = 2
+    C = 3
 
 # This is basically a struct for the line intersection algorithm to return.
 class MyIntersection:
@@ -62,15 +69,19 @@ class MyLine:
         
         # Return the struct-like object.
         return MyIntersection(True, t, s, self.p0 + t*self.dir)
-        
+
+    
+class MyActiveLine(MyLine):
+    def __init__(self, p0, p1, isSegment, activeType):
+        super().__init__(p0, p1, isSegment)
+        self.activeType = activeType
+
 
 class Scene:
         
     def __init__(self):
         self.polygons = []
         self.cwList = []
-
-        self.lines = []
         
         # In addition to keeping track of individual polygons,
         # we also keep track of ALL vertices in the scene.
@@ -80,6 +91,10 @@ class Scene:
         self.nextIndices = np.empty(0, dtype=np.int)
         self.polygonIndices = np.empty(0, dtype=np.int)
         
+        # May also combine these into a single thing
+        self.lines = []
+        self.lineTypes = []
+        
         # Boundaries for the scene.
         self.minX = math.inf
         self.maxX = -math.inf
@@ -87,24 +102,69 @@ class Scene:
         self.minY = math.inf
         self.maxY = -math.inf
         
-    def whichCaseIsIt(self):
-        return "Still need to implement this."
+    def getLineType(self, index0, index1):
         # If the two vertices form an edge, then it's the first case.
-        
+        if self.prevIndices[index0] ==  index1 or self.nextIndices[index0] == index1:
+            return SegmentType.A
         
         # Otherwise, need to determine which side of the line the two vertices "triangles" are on.
         # I'm going to use the inward-pointing bisector of each vertex's angle represent the direction pointing "inside" the triangle from the vertex.
         # The reason for using the bisector, rather than just one of the edges, is because
         # it is possible for one of the edges to lie on the line, but the bisector
         # never will.
+        v00 = self.vertices[self.prevIndices[index0]]
+        v01 = self.vertices[index0]
+        v02 = self.vertices[self.nextIndices[index0]]
+        
+        v10 = self.vertices[self.prevIndices[index1]]
+        v11 = self.vertices[index1]
+        v12 = self.vertices[self.nextIndices[index1]]
+        
+        dir00 = v00 - v01
+        dir01 = v02 - v01
+        # Make sure both dirs are normalized
+        length00 = np.linalg.norm(dir00)
+        length01 = np.linalg.norm(dir01)
+        dir00 = dir00 / length00
+        dir01 = dir01 / length01
+        
+        dir10 = v10 - v11
+        dir11 = v12 - v11
+        # Make sure both dirs are normalized
+        length10 = np.linalg.norm(dir10)
+        length11 = np.linalg.norm(dir11)
+        dir10 = dir10 / length10
+        dir11 = dir11 / length11
+        
+        
+        # Get the line bisecting the vertex's angle
+        unnormedBisect0 = dir00 + dir01
+        bisector0 = unnormedBisect0/np.linalg.norm(unnormedBisect0)
+        
+        
+        # Get the line bisecting the vertex's angle
+        unnormedBisect1 = dir10 + dir11
+        bisector1 = unnormedBisect1/np.linalg.norm(unnormedBisect1)
+
         
         # Then, we will consider a local coordinate frame where the free line is the up vector
         # From this, the "right" vector will be [y, -x]
         # The matrix to bring vectors into this local coord frame will be:
         # | y  -x |
         # | x   y | 
+        up = v11 - v01
+        changeBasis = np.array([
+            [up[1], -up[0]],
+            [up[0], up[1]]
+        ])
         
         # We convert the bisectors into this coord frame and see if their x values have the same sign.
+        localBisector0 = changeBasis @ bisector0
+        localBisector1 = changeBasis @ bisector1
+        
+        if (localBisector0[0] * localBisector1[0] > 0):
+            return SegmentType.B
+        return SegmentType.C
         
     def addPolygon(self, pts):
         newVertices = np.array(pts, dtype=np.float64)
@@ -166,6 +226,11 @@ class Scene:
         # full "lines", not "segments".
         self.lines.append(MyLine(p0, p1, False))
         
+    def addActiveLine(self, p0, p1, lineType):
+        # At this time, I'm assuming all lines added to the scene are 
+        # full "lines", not "segments".
+        self.lines.append(MyActiveLine(p0, p1, True, lineType))
+        
     def calcFreeLines(self):
         for i in range(len(self.vertices)):
             if self.isVertexConcave(i):
@@ -220,7 +285,8 @@ class Scene:
                         vertCount += 1
                     polygonCount += 1
                 if not intersectsObj:
-                    self.addLine(self.vertices[i], self.vertices[j])
+                    lineType = self.getLineType(i, j)
+                    self.addActiveLine(self.vertices[i], self.vertices[j], lineType)
                     
                     
     def isLineInsideEdgeAngle(self, vertIndex, dirToTest):
@@ -289,54 +355,64 @@ class Scene:
         # Plot all polygons.
         for obj in self.polygons:
             x,y = obj.exterior.xy
-            plt.fill(x,y, "r") # red fill
-            plt.plot(x,y, "b") # blue edges/outline
+            plt.fill(x,y, "#A0A0A0") # light grey fill
+            plt.plot(x,y, "#707070") # dark grey edges/outline
         
         for ln in self.lines:
-            # We want the lines in the scene to be rendered 
-            # such that they extend all the way to the scene's bounding box.
-            # To calculate where intersections with said box occur,
-            # the following calculations are done.
-            # First, initializing maxes/mins to inf.
-            tForwardX = math.inf
-            tForwardY = math.inf
-            tBackwardX = math.inf
-            tBackwardY = math.inf
-            # We don't know, in each direction, if we'll hit a vertical
-            # or horizontal border first, so we have to test both
-            # x and y. 
-            borderX = 0.1*(self.maxX - self.minX)
-            borderY = 0.1*(self.maxY - self.minY)
-            forwardXHit = self.maxX + borderX
-            forwardYHit = self.maxY + borderY
-            backwardXHit = self.minX - borderX
-            backwardYHit = self.minY -borderY
-            # If the direction vector has a negative component,
-            # then "forward" along it points to the min borders, not max ones.
-            if ln.dir[0] < 0:
-                forwardXHit, backwardXHit = backwardXHit, forwardXHit
-            if ln.dir[1] < 0:
-                forwardYHit, backwardYHit = backwardYHit, forwardYHit
+            newP0 = ln.p0
+            newP1 = ln.p1
+            if not ln.isSegment:
+                # We want the lines in the scene to be rendered 
+                # such that they extend all the way to the scene's bounding box.
+                # To calculate where intersections with said box occur,
+                # the following calculations are done.
+                # First, initializing maxes/mins to inf.
+                tForwardX = math.inf
+                tForwardY = math.inf
+                tBackwardX = math.inf
+                tBackwardY = math.inf
+                # We don't know, in each direction, if we'll hit a vertical
+                # or horizontal border first, so we have to test both
+                # x and y. 
+                borderX = 0.1*(self.maxX - self.minX)
+                borderY = 0.1*(self.maxY - self.minY)
+                forwardXHit = self.maxX + borderX
+                forwardYHit = self.maxY + borderY
+                backwardXHit = self.minX - borderX
+                backwardYHit = self.minY -borderY
+                # If the direction vector has a negative component,
+                # then "forward" along it points to the min borders, not max ones.
+                if ln.dir[0] < 0:
+                    forwardXHit, backwardXHit = backwardXHit, forwardXHit
+                if ln.dir[1] < 0:
+                    forwardYHit, backwardYHit = backwardYHit, forwardYHit
+                    
+                # If the direction vector is not vertical, see where it hits the x borders.
+                if ln.dir[0] != 0:
+                    tForwardX = (forwardXHit - ln.p0[0])/ln.dir[0]
+                    tBackwardX = (ln.p0[0] - backwardXHit)/ln.dir[0]
+                # If the direction vector is not horizontal, see where it hits the y borders.
+                if ln.dir[1] != 0:
+                    tForwardY = (forwardYHit - ln.p0[1])/ln.dir[1]
+                    tBackwardY = (ln.p0[1] - backwardYHit)/ln.dir[1]
+                    
+                # First hits get chosen.
+                tForward = min(tForwardX, tForwardY)
+                tBackward = -min(tBackwardX, tBackwardY)
                 
-            # If the direction vector is not vertical, see where it hits the x borders.
-            if ln.dir[0] != 0:
-                tForwardX = (forwardXHit - ln.p0[0])/ln.dir[0]
-                tBackwardX = (ln.p0[0] - backwardXHit)/ln.dir[0]
-            # If the direction vector is not horizontal, see where it hits the y borders.
-            if ln.dir[1] != 0:
-                tForwardY = (forwardYHit - ln.p0[1])/ln.dir[1]
-                tBackwardY = (ln.p0[1] - backwardYHit)/ln.dir[1]
-                
-            # First hits get chosen.
-            tForward = min(tForwardX, tForwardY)
-            tBackward = -min(tBackwardX, tBackwardY)
+                # Endpoints for the lines at these intersections created.
+                newP0 = ln.p0 + tBackward*ln.dir
+                newP1 = ln.p0 + tForward*ln.dir
             
-            # Endpoints for the lines at these intersections created.
-            newP0 = ln.p0 + tBackward*ln.dir
-            newP1 = ln.p0 + tForward*ln.dir
+            colString = "g"
+            if type(ln) is MyActiveLine:
+                if ln.activeType == SegmentType.A:
+                    colString = "r"
+                elif ln.activeType == SegmentType.B:
+                    colString = "b"
             
             # Line is drawn
-            plt.plot([newP0[0], newP1[0]], [newP0[1], newP1[1]], "g")
+            plt.plot([newP0[0], newP1[0]], [newP0[1], newP1[1]], colString)
             
         convex = []
         concave = []
@@ -384,10 +460,16 @@ world1.drawScene()
 world2.calcFreeLines()
 world2.drawScene()
 
+#%%
 reminders = [
      "isLineInsideEdgeAngle and parallelism and concavity!!!\n\nMake sure that discared if intersecting NEAR a concave vertex EVEN IF said vertex is NOT one of the TWO that made up the line!",
      "MULTIPLE LINES MAY BE IDENTICAL AT THE END! DOES THIS NEED TO BE DEALT WITH???",
-     "Right now, 2x as many lines as necessary are being created, because all i and j are considered for vertices nested loop.\n\nShould instead to i from 0..n, j from (i+1)..n"
+     "Right now, 2x as many lines as necessary are being created, because all i and j are considered for vertices nested loop.\n\nShould instead to i from 0..n, j from (i+1)..n",
+     "REMOVE SHAPELY? NOT REALLY USING IT THAT MUCH!",
+     "Maybe something like sweep can be done for line-segment intersections?\n\nReplace line with segment touching bounding box borders?",
+     "Pruning of lines that intersect obj at CONTACT verts.",
+     "Pruning of segments outside convex hull."
+     "To handle 'unions', make n x n mat of 0s, check for cancelling, etc."
      ]
 
 for reminder in reminders:
