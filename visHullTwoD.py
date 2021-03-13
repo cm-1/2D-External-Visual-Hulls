@@ -8,10 +8,86 @@ from enum import Enum
 
 EQUAL_THRESHOLD = 0.0001 # Threshold for considering certain fp numbers equal below.
 
+
+
+
+def findIntersection(segments):
+    q = Something() # Event queue initialization
+    
+    startVertex = None
+    
+    # Insert segment endpoints into q.
+        # Base it on y-coord. Tie break on x-coord.
+    # Items in here should contain:
+        # The endpoint coords or index
+        # An enum TYPE that is either UPPER, LOWER, or INTERSECTION
+        # An array for segments[] that connect to the intersection and/or endpoint.
+        
+    
+    
+    t = SomethingElse() # status structure T
+    
+    while not q.isEmpty():
+        p = q.pop()
+        
+        
+        if p.eventType == EventType.Upper:
+            s = p.upperSegments[0]
+            
+            # Use p to insert s into t
+            t.insert(p, s)
+            
+            # If s intersects left neighbour in t:
+                # Insert the intersection pt into q
+            # If s intersects right neighbour in t:
+                # Insert the intersection into q
+        
+        elif p.eventType == EventType.Lower:
+            s = p.lowerSegments[0]
+            
+            sLeft = t.left(s)
+            sRight = t.right(s)
+            
+            # Use p to delete s from t
+            
+            # If sLeft != None and sRight!= None and sLeft intersects sRight:
+                # If the intersection is below the sweep line (i.e., p's y pos):
+                    # Insert the intersection into q
+        
+        else: # It's an intersection
+            
+            # Reverse order of p.segments in t
+            # (Need to do something else if intersect @ an endpoint)
+            
+            
+            # Out of these, get sLeftmost and sRightmost
+            
+            sLeftmostNeighbour = t.left(sLeftmost)
+            sRightmostNeighbour = t.right(sRightmost)
+            
+            # if sLeftmostNeighbour != None and sLeftmostNeighbour intersects sLeftmost:
+                # If the intersection is below the sweep line (i.e., p's y pos):
+                    # Insert the intersection into q
+                    
+            # if sRightmostNeighbour != None and sRightmostNeighbour intersects sRightmost:
+                # If the intersection is below the sweep line (i.e., p's y pos):
+                    # Insert the intersection into q
+            
+            # DO SOMETHING WITH THE INTERSECTION POINT!
+            # . . .
+            # IT'S A VERTEX FOR SOME NEW GRAPH/MESH!
+            
+            if startVertex == None and p.
+
+        
+
 class SegmentType(Enum):
     A = 1
     B = 2
     C = 3
+    
+class NodeBST:
+    __init__(self)
 
 # This is basically a struct for the line intersection algorithm to return.
 class MyIntersection:
@@ -356,7 +432,7 @@ class Scene:
         for obj in self.polygons:
             x,y = obj.exterior.xy
             plt.fill(x,y, "#A0A0A0") # light grey fill
-            plt.plot(x,y, "#707070") # dark grey edges/outline
+            plt.plot(x,y, "#505050") # dark grey edges/outline
         
         for ln in self.lines:
             newP0 = ln.p0
