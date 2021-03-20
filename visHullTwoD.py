@@ -9,7 +9,60 @@ from enum import Enum
 EQUAL_THRESHOLD = 0.0001 # Threshold for considering certain fp numbers equal below.
 
 
+class RedBlackNode:
+    def __init__(self, value):
+        self.isRed = False
+        self.left = None
+        self.right = None
+        self.parent = None
+        self.data = value
+        
+    def search(self, value):
 
+        if value < self.data and self.left != None:
+            return self.left.search(value)
+        elif value > self.data and self.right != None:
+            return self.right.search(value)
+        
+        return self
+    
+    def insert(self, value):
+        
+        
+        if newNode.uncle().isRed:
+            newNode.parent.isRed = False
+            newNode.uncle().isRed = False
+        
+    
+    def height(self):
+        lHeight = 1
+        rHeight = 1
+        if self.left != None:
+            lHeight = self.left.height()
+        if self.right != None:
+            rHeight = self.right.height()
+        
+        return 1 + max(lHeight, rHeight)
+    
+    def nodeCount(self):
+        lNodes = 1
+        rNodes = 1
+        if self.left != None:
+            lNodes = self.left.nodeCount()
+        if self.right != None:
+            rNodes = self.right.nodeCount()
+        
+        return 1 + lNodes + rNodes
+    
+    def uncle(self):
+        grandparent = self.parent.parent
+        parentIsLeft = (self.parent == self.parent.parent.left)
+        if parentIsLeft:
+            return self.parent.parent.right
+        return self.parent.parent.left
+    
+    
+            
 
 def findIntersection(segments):
     q = Something() # Event queue initialization
