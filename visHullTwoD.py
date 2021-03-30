@@ -22,19 +22,21 @@ class EventType(Enum):
 #%%
 
 class SweepLine:
-    def __init__(self, x):
+    def __init__(self, x, y, eventType):
         self.x = x
+        self.y = y
+        self.eventType = eventType
             
 # Sweep line implementation!
 def findIntersections(segments):
     t = RedBlackTree()
     
     q = []
-    # I'm pretty sure this line's not needed, but I'm not taking chances right now. In a hurry.
+    # I'm pretty sure this next line's not needed, but I'm not taking chances right now. In a hurry.
     heapq.heapify(q)
     
     sortableSegments = []
-    sweepLine = SweepLine(0)
+    sweepLine = SweepLine(0, 0, EventType.LEFT)
     
     for i in range(len(segments)):
         s = segments[i]
@@ -61,11 +63,16 @@ def findIntersections(segments):
     
         
     while len(q) > 0:
+        if eventCount == 35:
+            print("here!")
         print("\nEvents:", eventCount)
         eventCount += 1
 
         p = heapq.heappop(q)
         print("Event: ", p)
+        
+        
+
         
         print("Intersections({0}):".format(len(intersections)))
         for isec in intersections:
@@ -79,11 +86,19 @@ def findIntersections(segments):
                 p.merge(pToMerge)
                 print("merged segSet:", [s.index for s in p.segments])
         sweepLine.x = p.x
+        sweepLine.y = p.y
+        sweepLine.eventType = p.eventType
+        
+        for sThing in t.valueList():
+            if not t.isMatchingNodeInTree(sThing.node):
+                print("Problem for", sThing, "node!!!")
+                
         if p.eventType == EventType.LEFT:
             s = next(iter(p.segments))
             
             sNode = t.add(s) # RBTODO
             s.node = sNode
+            sNode.subscribers.add(s)
             
             succ = t.successor(sNode) # RBTODO
             pred = t.predecessor(sNode) # RBTODO
@@ -116,10 +131,22 @@ def findIntersections(segments):
             
             sNode = s.node
             
+            for sThing in t.valueList():
+                if not t.isMatchingNodeInTree(sThing.node):
+                    print("Problem for", sThing, "node!!!")
+            
             pred = t.predecessor(sNode) # RBTODO
             succ = t.successor(sNode) # RBTODO
             
+            for sThing in t.valueList():
+                if not t.isMatchingNodeInTree(sThing.node):
+                    print("Problem for", sThing, "node!!!")
+            
             t.removeGivenNode(sNode) # RBTODO
+            
+            for sThing in t.valueList():
+                if not t.isMatchingNodeInTree(sThing.node):
+                    print("Problem for", sThing, "node!!!")
             
             if pred and succ:
                 predSeg = pred.value
@@ -134,6 +161,9 @@ def findIntersections(segments):
                     intEvent = MySweepEvent(succInt.meetPt[0], succInt.meetPt[1], {predSeg, succSeg}, EventType.INTERSECTION, eventCount-1)
                     print("\tintEvent:", intEvent)
                     heapq.heappush(q, intEvent) # RBTODO
+            for sThing in t.valueList():
+                if not t.isMatchingNodeInTree(sThing.node):
+                    print("Problem for", sThing, "node!!!")
         
         else: # It's an intersection
             newElem = np.array((p.x, p.y))
@@ -151,8 +181,15 @@ def findIntersections(segments):
                 tempNode = s0.node
                 s0.node = s1.node
                 s1.node = tempNode
+                s0.node.subscribers.remove(s1)
+                s0.node.subscribers.add(s0)
+                s1.node.subscribers.remove(s0)
+                s1.node.subscribers.add(s1)
                 s0.node.value = s0
                 s1.node.value = s1
+                
+                s0.lastIntersectionY = p.y
+                s1.lastIntersectionY = p.y
                 
             print("maxSeg:", maxSeg)
             print("minSeg:", minSeg)
@@ -187,6 +224,10 @@ def findIntersections(segments):
         t.printTree()
         print("---")
         print(t.valueList())
+        
+        for sThing in t.valueList():
+            if not t.isMatchingNodeInTree(sThing.node):
+                print("Problem for", sThing, "node!!!")
     return intersections
         
 class MySweepEvent:
@@ -221,10 +262,10 @@ class MySweepEvent:
         if self.x < other.x - EQUAL_THRESHOLD:
             retVal = True
         elif abs(self.x - other.x) < EQUAL_THRESHOLD:
-            if self.eventType.value < other.eventType.value:
+            if self.y < other.y - EQUAL_THRESHOLD:
                 retVal = True
-            elif self.eventType == other.eventType:
-                if self.y < other.y - EQUAL_THRESHOLD:
+            elif abs(self.y - other.y) < EQUAL_THRESHOLD:
+                if self.eventType.value < other.eventType.value:
                     retVal = True
         return retVal
     
@@ -306,7 +347,7 @@ class MyLine:
                 numEqual = np.sum(endpointEqualities)
                 if numEqual == 1:
                     eqIndex = np.where(endpointEqualities)[0][0]
-                    s = int(eqIndex < 2) * self.length
+                    s = int(eqIndex > 1) * self.length
                     t = int(eqIndex % 2) * other.length
                     return MyIntersection(True, s, t, self.p0 + s*self.dir)
             # If none of the above hold, there's no or infinite intersection.
@@ -335,6 +376,9 @@ class MyActiveLine(MyLine):
         self.increasesToTheRight = increasesToTheRight
     def __repr__(self):
         return "{0}->{1}, right+ is {2}".format(self.p0, self.p1, self.increasesToTheRight)
+    def swapDir(self):
+        self.p0, self.p1 = self.p1, self.p0
+        self.increasesToTheRight = not self.increasesToTheRight
 
 class MySortableSegment(MyLine):
     def __init__(self, p0, p1, sweepLine, index):
@@ -342,20 +386,23 @@ class MySortableSegment(MyLine):
         self.sweepLine = sweepLine
         self.index = index
         self.node = None
+        self.lastIntersectionY = p0[1]
         
     def __repr__(self):
         return "[ ({0}, {1}) -> ({2}, {3}) ]".format(self.p0[0], self.p0[1], self.p1[0], self.p1[1])
         
     def currentY(self):
         if self.isVertical:
-            return self.p0[1]
+            return self.lastIntersectionY
         return self.m * self.sweepLine.x + self.b
 
-    def __eq__(self, other):
+    # Might rethink this at some point.
+    # But be careful not to break == usage in tree!
+    def __eq__(self, other): 
         if other:
-            if self.isVertical and other.isVertical and self.p0[0] == other.p0[0]:
-                return True
-            if self.m == other.m and self.b == other.b:
+            diff0 = np.linalg.norm(self.p0 - other.p0)
+            diff1 = np.linalg.norm(self.p1 - other.p1)
+            if diff0 < EQUAL_THRESHOLD and diff1 < EQUAL_THRESHOLD:
                 return True
         return False
     def __ne__(self, other):
@@ -367,15 +414,26 @@ class MySortableSegment(MyLine):
         otherY = other.currentY()
         diff = selfY - otherY
         if abs(diff) < EQUAL_THRESHOLD:
-            if self.isVertical:
+            surpassed = (self.sweepLine.y > selfY + EQUAL_THRESHOLD)
+            hereButRemoving = abs(self.sweepLine.y - selfY) < EQUAL_THRESHOLD and self.sweepLine.eventType == EventType.RIGHT
+            # Special case where two vertical line segments connect
+            if self.isVertical and other.isVertical:
+                retVal = self.p1[1] > other.p1[1]
+            elif self.isVertical:
                 retVal = True
             elif other.isVertical:
                 retVal = False
+            elif abs(self.m - other.m) < EQUAL_THRESHOLD:
+                return self.p0[0] < other.p0[0]
             else:
                 retVal = self.m > other.m
+                    
+            if surpassed or hereButRemoving:
+                retVal = not retVal
         else:
             retVal = diff < 0
         return retVal
+    
     def __le__(self, other):
         return self.__lt__(other) or self.__eq__(other)
     def __gt__(self, other):
@@ -646,8 +704,7 @@ class Scene:
                 for i in range(len(segsToUnify)):
                     s = segsToUnify[i]
                     if s.p0[axisNum] > s.p1[axisNum]:
-                        s.p0, s.p1 = s.p1, s.p0
-                        s.increasesToTheRight = not s.increasesToTheRight
+                        s.swapDir()
                     coordsOnLn.append({"x": s.p0[0], "y": s.p0[1], "segsStartingHere": [i]})
                     coordsOnLn.append({"x": s.p1[0], "y": s.p1[1], "segsStartingHere": []})
                     
@@ -694,10 +751,6 @@ class Scene:
                         p0 = (uniqueCoords[i]["x"], uniqueCoords[i]["y"])
                         p1 = (uniqueCoords[i+1]["x"], uniqueCoords[i+1]["y"])
                         self.activeSegments.append(MyActiveLine(p0, p1, SegmentType.D, interval["right"] > 0))
-                
-                
-                
-                    
                     
     def isLineInsideEdgeAngle(self, vertIndex, dirToTest):
         if self.isVertexConcave(vertIndex):
@@ -833,9 +886,9 @@ class Scene:
             plt.plot([ln.p0[0], ln.p1[0]], [ln.p0[1], ln.p1[1]], colString2)
         
         # !!!! Left off at event 21.
-        #myPts = findIntersections(segments)
-        #print("Found: " , len(myPts), " intersections!")
-        
+        myPts = findIntersections(self.activeSegments)
+        print("Found: " , len(myPts), " intersections!")
+        plt.plot([myPt[0] for myPt in myPts], [myPt[1] for myPt in myPts], 'go')
         
         convex = []
         concave = []
@@ -846,6 +899,8 @@ class Scene:
                 convex.append(self.vertices[i])
         npConvex = np.array(convex)
         npConcave = np.array(concave)
+        
+        '''
         for maxSeg in self.activeSegments:
             for succSeg in self.activeSegments:
                 succInt = maxSeg.intersection(succSeg);
@@ -853,6 +908,7 @@ class Scene:
                 onSecondSegment = succInt.meetT > -EQUAL_THRESHOLD and succInt.meetT < succSeg.length + EQUAL_THRESHOLD
                 if succInt.doMeet and onFirstSegment and onSecondSegment:
                     plt.plot([succInt.meetPt[0]], [succInt.meetPt[1]], 'ko')
+        '''
         '''if npConvex.shape[0] > 0:
             plt.plot(npConvex[:, 0], npConvex[:, 1], 'bo')
         if npConcave.shape[0] > 0:
@@ -863,18 +919,18 @@ world0 = Scene()
 world1 = Scene()
 world2 = Scene()
 world3 = Scene()
+world4 = Scene()
 
 
 # These are the tris from Petitjean's diagram
-polygon1 = [(0, 7), (2.25, 5), (1.25, 4), (5, 5)] # [(0, 0), (2.25, 0.5), (1.25, 2.3)] # [(0,3),(1,1),(3,0),(4,0),(3,4)]
-polygon2 = [(1.15, -3.15), (4, -4), (2, -7), (0.9, -5.25)] #[(1.15, 3.15), (4, 4), (0.9, 5.25)] # [(1,4),(2,5),(2,1),(1,3)]
-polygon3 = [(3, 1), (3, 0.0), (4.85, 0.75), (4.85, 2.4), (5,4)] #[(3, 0.7), (4.85, 1.75), (4.85, 3.4)]
-polygon4 = [(-0.5, -1), (-0.5, 1.0), (0.5, 1), (0.5, -1)] #[(3, 0.7), (4.85, 1.75), (4.85, 3.4)]
+polygon1 = [(0, 0), (2.25, 0.5), (1.25, 2.3)] # [(0,3),(1,1),(3,0),(4,0),(3,4)]
+polygon2 = [(1.15, 3.15), (4, 4), (0.9, 5.25)] # [(1,4),(2,5),(2,1),(1,3)]
+polygon3 = [(3, 0.7), (4.85, 1.75), (4.85, 3.4)]
 
 world0.addPolygon(polygon1)
 world0.addPolygon(polygon2)
 world0.addPolygon(polygon3)
-world0.addPolygon(polygon4)
+#world0.addPolygon(polygon4)
 
 polygon1 = [(0, 0), (5, 0), (5, 5), (4, 5), (4, 3), (1, 3), (1, 5), (0, 5)]
 world1.addPolygon(polygon1)
@@ -890,7 +946,21 @@ polygon2 = [(p[0] - 3, p[1]) for p in polygon2]
 world3.addPolygon(polygon1)
 world3.addPolygon(polygon2)
 
+polygon1 = [(0, 7), (2.25, 5), (1.25, 4), (5, 5)] # [(0, 0), (2.25, 0.5), (1.25, 2.3)] # [(0,3),(1,1),(3,0),(4,0),(3,4)]
+polygon2 = [(1.15, -3.15), (4, -4), (2, -7), (0.9, -5.25)] #[(1.15, 3.15), (4, 4), (0.9, 5.25)] # [(1,4),(2,5),(2,1),(1,3)]
+polygon3 = [(3, 1), (3, 0.0), (4.85, 0.75), (4.85, 2.4), (5,4)] #[(3, 0.7), (4.85, 1.75), (4.85, 3.4)]
+polygon4 = [(-0.5, -1), (-0.5, 1.0), (0.5, 1), (0.5, -1)] #[(3, 0.7), (4.85, 1.75), (4.85, 3.4)]
+
+world4.addPolygon(polygon1)
+world4.addPolygon(polygon2)
+world4.addPolygon(polygon3)
+world4.addPolygon(polygon4)
+
 #world.addLine((0, 2.5), (3, 2.5))
+
+
+world2.calcFreeLines()
+world2.drawScene()
 
 world0.calcFreeLines()
 world0.drawScene()
@@ -898,11 +968,16 @@ world0.drawScene()
 world1.calcFreeLines()
 world1.drawScene()
 
-world2.calcFreeLines()
-world2.drawScene()
 
 world3.calcFreeLines()
 world3.drawScene()
+
+world4.calcFreeLines()
+world4.drawScene()
+
+
+
+
 
 #%%
 reminders = [
