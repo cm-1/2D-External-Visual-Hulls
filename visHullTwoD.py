@@ -1,12 +1,11 @@
 import matplotlib.pyplot as plt
+
 import numpy as np
 import math
 from enum import Enum
 from collections import deque
 import heapq
 
-import random
-from shapely.geometry import Polygon
 from rbt import RedBlackTree # REALLY NEED TO REWRITE THIS!
 
 EQUAL_THRESHOLD = 0.0001 # Threshold for considering certain fp numbers equal below.
@@ -670,7 +669,25 @@ class MySortableSegment(MyActiveLine):
     def __hash__(self):
         return hash(self.index) # Maybe return just self.index?
     
-
+class MyPolygon:
+    def __init__(self, pts):
+        npts = np.array(pts)
+        # "Close" the polygon s.t. the first and last vertex are identical.
+        # First, check if the first and last points are already the same.
+        if not np.all(npts[0] == npts[-1]):
+            # If not, add the first pt to the end.
+            npts = np.vstack((npts, npts[0, :]))
+        self._coords = npts
+    
+    def getCoords(self):
+        return np.copy(self._coords) # Look into the shallow/deep copy nature of this at some point!
+    
+    def getSeparateXYs(self):
+        xs = self._coords[:, 0]
+        ys = self._coords[:, 1]
+        
+        return (xs, ys)
+    
 class Scene:
         
     def __init__(self):
@@ -783,7 +800,7 @@ class Scene:
         newVertices = np.array(pts, dtype=np.float64)
         #newVertices[:, 0] = newVertices[:, 0] - 2.33
 
-        self.polygons.append(Polygon(pts)) #newVertices.tolist()))
+        self.polygons.append(MyPolygon(pts)) #newVertices.tolist()))
         
         # Find out whether the polygon is clockwise or counterclockwise.
         # Will be using the technique given in StackOverflow user Beta's answer
@@ -855,11 +872,11 @@ class Scene:
                 vertCount = 0 # Vertex index of start of current edge analyzed
                 while polygonCount < len(self.polygons) and not intersectsObj:
                     obj = self.polygons[polygonCount]
-                    pts = obj.exterior.coords
+                    pts = obj.getCoords()
                     numPts = len(pts)
                     edgeNum = 0 # Like vertCount, but just for this polygon rather than whole scene.
                     
-                    # pts, i.e. obj.exterior.coords, is organized where the 1st vertex is repeated at the end.
+                    # pts, i.e. obj.getCoords(), is organized where the 1st vertex is repeated at the end.
                     # Therefore, for the edge between the 1st and last vertices,
                     # we don't need to cycle around with a (n + 1)%numPts or anything.
                     # The line between the 1st and last vertices is created using the 2nd-last and last array items.
@@ -1091,7 +1108,7 @@ class Scene:
         print("cwList:", self.cwList)
         # Plot all polygons.
         for obj in self.polygons:
-            x,y = obj.exterior.xy
+            x,y = obj.getSeparateXYs()
             plt.fill(x,y, "#A0A0A0") # light grey fill
             plt.plot(x,y, "#505050") # dark grey edges/outline
         for ln in self.lines:
@@ -1350,7 +1367,8 @@ reminders = [
      "Pruning of segments outside convex hull.",
      "Replace RB Tree with my own, or one with better licensing!"
      "Right now, swapDir() side effect in findIntersections(). Should this be changed?",
-     "All of this 'is (not) None' checking for the half-edge structure should be fixed!"
+     "All of this 'is (not) None' checking for the half-edge structure should be fixed!",
+     "Separate matplotlib part from the rest!"
      ]
 
 for reminder in reminders:
