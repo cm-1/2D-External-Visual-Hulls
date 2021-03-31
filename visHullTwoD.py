@@ -6,21 +6,16 @@ from collections import deque
 import heapq
 
 import random
-from shapely.geometry import Polygon, LineString
+from shapely.geometry import Polygon
 from rbt import RedBlackTree # REALLY NEED TO REWRITE THIS!
 
 EQUAL_THRESHOLD = 0.0001 # Threshold for considering certain fp numbers equal below.
 EQUAL_DECIMAL_PLACES = -round(math.log(EQUAL_THRESHOLD, 10))
 
-
-
-
 class EventType(Enum):
     LEFT = 0
     INTERSECTION = 1
     RIGHT = 2
-
-  
  
 #%%
 
@@ -35,21 +30,30 @@ class Vertex:
         self.position = np.array(position)
         self.outgoingHalfEdge = outgoingHalfEdge
         self.vertexID = vertexID
+    '''def __eq__(self, other):
+        return np.linalg.norm(self.position - other.position) < EQUAL_THRESHOLD and self.vertexID == other.vertexID and self.outgoingHalfEdge == other.outgoingHalfEdge
+    def __hash__(self):
+        return hash((self.position[0], self.position[1], self.vertexID))'''
         
 class Face:
     def __init__(self, halfEdge, index):
         self.halfEdge = halfEdge
         self.index = index
+        self.visualNumber = -1
+    def __eq__(self, other):
+        return self.index == other.index
+    def __hash__(self):
+        return hash(self.index)
 
 class HalfEdge:
-    def __init__(self, index):
+    def __init__(self, index, increasesLeft):
         self.headVertex = None
         self.next = None
         self.prev = None
         self.pair = None
         self.leftFace = None
         self.index = index
-        # self.increasesLeft = increasesLeft
+        self.increasesLeft = increasesLeft
 
 class HalfEdgeStructure:
     def __init__(self):
@@ -57,6 +61,7 @@ class HalfEdgeStructure:
         self.halfEdges = []
         self.faces = []
         self._exteriorFaceIndex = -1
+        self.vertexOnShape = None
 
     def assignExteriorFace(self, halfEdge):
         if self._exteriorFaceIndex < 0:
@@ -73,9 +78,9 @@ class HalfEdgeStructure:
         del self.halfEdges[index1]
         del self.halfEdges[index0]
 
-    def createNewPairOfHalfEdges(self, vertex):
-        newEdge = HalfEdge(len(self.halfEdges))
-        newPair = HalfEdge(len(self.halfEdges) + 1)
+    def createNewPairOfHalfEdges(self, vertex, increasesLeft):
+        newEdge = HalfEdge(len(self.halfEdges), increasesLeft)
+        newPair = HalfEdge(len(self.halfEdges) + 1, not increasesLeft)
         newPair.headVertex = vertex
         
         newEdge.pair = newPair
@@ -109,17 +114,21 @@ def findIntersections(segments):
         s = segments[i]
         pL = s.p0
         pR = s.p1
+        shouldSwap = False
         if pR[0] < pL[0]:
-            pL, pR = pR, pL
+            shouldSwap = True
         elif pR[0] == pL[0]:
             if pR[1] < pL[1]:
-                pL, pR = pR, pL
+                shouldSwap = True
         
-        sortableSegment = MySortableSegment(pL, pR, sweepLine, i)
+        if shouldSwap:
+            s.swapDir()
+        
+        sortableSegment = MySortableSegment(s, sweepLine, i)
         sortableSegments.append(sortableSegment)
         
-        lEnd = MySweepEvent(pL[0], pL[1], {sortableSegment}, EventType.LEFT)
-        rEnd = MySweepEvent(pR[0], pR[1], {sortableSegment}, EventType.RIGHT)
+        lEnd = MySweepEvent(s.p0[0], s.p0[1], {sortableSegment}, EventType.LEFT)
+        rEnd = MySweepEvent(s.p1[0], s.p1[1], {sortableSegment}, EventType.RIGHT)
         
         heapq.heappush(q, lEnd)
         heapq.heappush(q, rEnd)
@@ -250,7 +259,6 @@ def findIntersections(segments):
             maxSeg = intSegments[0]
             minSeg = intSegments[-1]
 
-            newVertex = Vertex((p.x, p.y), None)
 
             extendBeforeInt = []
             extendAfterInt = []
@@ -276,7 +284,24 @@ def findIntersections(segments):
                     extendBeforeInt.append(intSeg)
                 if after:
                     extendAfterInt.insert(0, intSeg)  
-                    
+            
+            newVertex = Vertex((p.x, p.y), None)
+            segIndex = 0
+            while newVertex.vertexID < 0 and segIndex < len(extendBeforeInt):
+                vertSeg = extendBeforeInt[segIndex]
+                if vertSeg.p1Index >= 0 and abs(vertSeg.p1[0] - p.x) < EQUAL_THRESHOLD and abs(vertSeg.p1[1] - p.y) < EQUAL_THRESHOLD:
+                    newVertex.vertexID = vertSeg.p1Index
+                segIndex += 1
+            segIndex = 0
+            while newVertex.vertexID < 0 and segIndex < len(extendAfterInt):
+                vertSeg = extendAfterInt[segIndex]
+                if vertSeg.p0Index >= 0 and abs(vertSeg.p0[0] - p.x) < EQUAL_THRESHOLD and abs(vertSeg.p0[1] - p.y) < EQUAL_THRESHOLD:
+                    newVertex.vertexID = vertSeg.p0Index
+                segIndex += 1
+            partitionMesh.verts.append(newVertex)
+            if partitionMesh.vertexOnShape is None and newVertex.vertexID >= 0:
+                partitionMesh.vertexOnShape = newVertex
+
             print("Before Segs:")
             for bs in extendBeforeInt:
                 print("\t", bs)
@@ -318,7 +343,7 @@ def findIntersections(segments):
 
             newForwardHalfEdges = []
             for i in range(len(extendAfterInt)):
-                newForwardHalfEdges.append(partitionMesh.createNewPairOfHalfEdges(newVertex))
+                newForwardHalfEdges.append(partitionMesh.createNewPairOfHalfEdges(newVertex, not extendAfterInt[i].increasesToTheRight))
 
             # First two cases are where we're at a "corner" on the edge the set of regions.
             # Third case is when there are lines both before and after the intersection.
@@ -560,23 +585,33 @@ class MyLine:
 
     
 class MyActiveLine(MyLine):
-    def __init__(self, p0, p1, activeType, increasesToTheRight):
+    def __init__(self, p0, p1, p0Index, p1Index, activeType, increasesToTheRight):
         super().__init__(p0, p1, True)
+        self.p0Index = p0Index
+        self.p1Index = p1Index
         self.activeType = activeType
         self.increasesToTheRight = increasesToTheRight
     def __repr__(self):
         return "{0}->{1}, right+ is {2}".format(self.p0, self.p1, self.increasesToTheRight)
     def swapDir(self):
         self.p0, self.p1 = self.p1, self.p0
+        self.p0Index, self.p1Index = self.p1Index, self.p0Index
         self.increasesToTheRight = not self.increasesToTheRight
 
-class MySortableSegment(MyLine):
-    def __init__(self, p0, p1, sweepLine, index):
-        super().__init__(p0, p1, True)
+class MySortableSegment(MyActiveLine):
+    def __init__(self, activeLine, sweepLine, index):
+        super().__init__(
+            activeLine.p0,
+            activeLine.p1,
+            activeLine.p0Index,
+            activeLine.p1Index,
+            activeLine.activeType,
+            activeLine.increasesToTheRight
+        )
         self.sweepLine = sweepLine
         self.index = index
         self.node = None
-        self.lastIntersectionY = p0[1]
+        self.lastIntersectionY = activeLine.p0[1]
         self.forwardHalfEdge = None
         
     def __repr__(self):
@@ -674,9 +709,9 @@ class Scene:
         
         # If the two vertices form an edge, then it's the first case.
         if self.prevIndices[index0] ==  index1:
-            return [MyActiveLine(v11, v01, SegmentType.A, not cwV0)]
+            return [MyActiveLine(v11, v01, index1, index0, SegmentType.A, not cwV0)]
         elif self.nextIndices[index0] == index1:
-            return [MyActiveLine(v01, v11, SegmentType.A, not cwV0)]
+            return [MyActiveLine(v01, v11, index0, index1, SegmentType.A, not cwV0)]
 
         
         # Otherwise, need to determine which side of the line the two vertices "triangles" are on.
@@ -729,17 +764,17 @@ class Scene:
         
         retVals = []
         if localBisector0[0] > 0 and localBisector1[0] > 0:
-            retVals = [MyActiveLine(v11, v01, SegmentType.B, True)]
+            retVals = [MyActiveLine(v11, v01, index1, index0, SegmentType.B, True)]
         elif localBisector0[0] < 0 and localBisector1[0] < 0:
-            retVals = [MyActiveLine(v01, v11, SegmentType.B, True)]
+            retVals = [MyActiveLine(v01, v11, index0, index1, SegmentType.B, True)]
         else:
             b0, b1 = self.sceneBorderHitPoints(MyLine(v01, v11, False))
             if np.dot((b1 - b0), up) < 0:
                 b0, b1 = b1, b0
             
             incToRight = localBisector0[0] < 0
-            seg1 = MyActiveLine(b0, v01, SegmentType.C, incToRight)
-            seg2 = MyActiveLine(b1, v11, SegmentType.C, incToRight)
+            seg1 = MyActiveLine(b0, v01, -1, index0, SegmentType.C, incToRight)
+            seg2 = MyActiveLine(b1, v11, -1, index1, SegmentType.C, incToRight)
             retVals = [seg1, seg2]
             
         return retVals
@@ -896,8 +931,8 @@ class Scene:
                     s = segsToUnify[i]
                     if s.p0[axisNum] > s.p1[axisNum]:
                         s.swapDir()
-                    coordsOnLn.append({"x": s.p0[0], "y": s.p0[1], "segsStartingHere": [i]})
-                    coordsOnLn.append({"x": s.p1[0], "y": s.p1[1], "segsStartingHere": []})
+                    coordsOnLn.append({"x": s.p0[0], "y": s.p0[1], "index": s.p0Index, "segsStartingHere": [i]})
+                    coordsOnLn.append({"x": s.p1[0], "y": s.p1[1], "index": s.p1Index, "segsStartingHere": []})
                     
                 coordsOnLn.sort(key = (lambda a: a[axisKey]))
                             
@@ -941,7 +976,9 @@ class Scene:
                     else:
                         p0 = (uniqueCoords[i]["x"], uniqueCoords[i]["y"])
                         p1 = (uniqueCoords[i+1]["x"], uniqueCoords[i+1]["y"])
-                        self.activeSegments.append(MyActiveLine(p0, p1, SegmentType.D, interval["right"] > 0))
+                        p0Index = (uniqueCoords[i]["index"])
+                        p1Index = (uniqueCoords[i+1]["index"])
+                        self.activeSegments.append(MyActiveLine(p0, p1, p0Index, p1Index, SegmentType.D, interval["right"] > 0))
                     
     def isLineInsideEdgeAngle(self, vertIndex, dirToTest):
         if self.isVertexConcave(vertIndex):
@@ -1048,6 +1085,8 @@ class Scene:
         newP1 = ln.p0 + tForward*ln.dir
         return (newP0, newP1)
     
+        
+    
     def drawScene(self):
         print("cwList:", self.cwList)
         # Plot all polygons.
@@ -1088,12 +1127,15 @@ class Scene:
                 plt.plot([v0[0], v1[0]], [v0[1], v1[1]], "r--")
             else:
                 print("Some problem")'''
+        correctedFaces = set()
+        facesToDraw = []
         for f in partitionMesh.faces:
             if partitionMesh.isExteriorFace(f):
                 continue
             he = f.halfEdge
             if he.headVertex is None:
                 continue
+            correctedFaces.add(f)
             v = he.headVertex.position
             xs = [v[0]]
             ys = [v[1]]
@@ -1106,8 +1148,90 @@ class Scene:
                 xs.append(v[0])
                 ys.append(v[1])
                 he = he.next
-            plt.fill(xs,ys)
+            facesToDraw.append({"face":f,"xs": xs,"ys":ys})
         
+        # We know that the below vertex is on the shape.
+        # Now we need to find out which of its faces has visual number 0.
+        # First, we can assume the vertex is convex, else it wouldn't
+        # be a part of an active segment processed above.
+        # So, the "bisector" of its two edges points into the shape.
+        # We just need to find two half edges that "enclose" it.
+        # That would thus mean they also enclose that part of the shape.
+        vertOnShape = partitionMesh.vertexOnShape
+        vertIndex = vertOnShape.vertexID
+        v0 = self.vertices[self.prevIndices[vertIndex]]
+        v1 = self.vertices[vertIndex]
+        v2 = self.vertices[self.nextIndices[vertIndex]]
+        
+        dir0 = v0 - v1
+        dir1 = v2 - v1
+        # Make sure both dirs are normalized
+        length0 = np.linalg.norm(dir0)
+        length1 = np.linalg.norm(dir1)
+        dir0 = dir0 / length0
+        dir1 = dir1 / length1
+        
+        
+        # Get the line bisecting the vertex's angle
+        unnormedBisect = dir0 + dir1
+        bisector = unnormedBisect/np.linalg.norm(unnormedBisect)
+        
+        startingFace = None
+        vertHalfEdge = vertOnShape.outgoingHalfEdge
+        while startingFace is None:
+            v0Edge = vertHalfEdge
+            # Next edge in ccw direction.
+            v2Edge = vertHalfEdge.prev.pair
+            
+            v0 = v0Edge.headVertex.position
+            v2 = v2Edge.headVertex.position
+            # v1 is the same as in the bisector calculation.
+            
+            v0Angle = math.atan2(v0[1] - v1[1], v0[0] - v1[0]) + math.pi
+            v2Angle = math.atan2(v2[1] - v1[1], v2[0] - v2[0]) + math.pi
+            bisectorAngle = math.atan2(bisector[1], bisector[0]) + math.pi
+            # Case where the v0 to v2 range crosses over 0 radians axis.
+            if v2Angle < v0Angle:
+                v2Angle += (2.0 * math.pi) - v0Angle
+                bisectorAngle += (2.0 * math.pi) - v0Angle 
+            
+            if bisectorAngle > v0Angle and bisectorAngle < v2Angle:
+                startingFace = v0Edge.leftFace
+            
+            vertHalfEdge = vertHalfEdge.pair.next
+            
+        
+        # Now, DFS to assign visual numbers to all faces.
+        stack = [{"face": startingFace, "visualNumber": 0}]
+        if not (startingFace in correctedFaces):
+            print("TROUBLE!")
+        while len(stack) > 0:
+            currFace = stack.pop()
+            if currFace["face"].visualNumber < 0:
+                vn = currFace["visualNumber"]
+                currFace["face"].visualNumber = vn
+                halfEdge = currFace["face"].halfEdge
+                adjFace = halfEdge.pair.leftFace
+                if (not partitionMesh.isExteriorFace(adjFace)) and (adjFace in correctedFaces):
+                    vnChange = -1 if halfEdge.increasesLeft else 1
+                    stack.append({"face": adjFace, "visualNumber": vn+vnChange})
+                    
+                origHalfEdge = halfEdge
+                halfEdge = halfEdge.next
+                while halfEdge != origHalfEdge:
+                    if halfEdge is None:
+                        break
+                    adjFace = halfEdge.pair.leftFace
+                    if (not partitionMesh.isExteriorFace(adjFace)) and (adjFace in correctedFaces):
+                        vnChange = -1 if halfEdge.increasesLeft else 1
+                        stack.append({"face": adjFace, "visualNumber": vn+vnChange})
+                    halfEdge = halfEdge.next
+        
+        colours = ["k", "r", "g", "b", "y"]
+        for f in facesToDraw:
+            regionColour = colours[min(f["face"].visualNumber, len(colours) - 1)]
+            plt.fill(f["xs"], f["ys"], regionColour)
+            
         convex = []
         concave = []
         for i in range(self.vertices.shape[0]):
@@ -1138,6 +1262,8 @@ world1 = Scene()
 world2 = Scene()
 world3 = Scene()
 world4 = Scene()
+world5 = Scene()
+world6 = Scene()
 
 
 # These are the tris from Petitjean's diagram
@@ -1174,6 +1300,22 @@ world4.addPolygon(polygon2)
 world4.addPolygon(polygon3)
 world4.addPolygon(polygon4)
 
+polygon1 = [(0, 0.6), (1.5, 0), (2.5, 1.25), (1.25, 0.75), (1.125, 1.8)]
+polygon2 = [(1.3, 2.25), (2.8, 2.8), (1.65, 3.125)]
+polygon3 = [(2.8, 1.25), (4.125, 0.25), (3.5, 2.0)]
+
+world5.addPolygon(polygon1)
+world5.addPolygon(polygon2)
+world5.addPolygon(polygon3)
+
+polygon1 = [(0,0), (2.5, 0), (0, 1.5)]
+polygon2 = [(0, 3.25), (5, 4.25), (0, 4.25)]
+polygon3 = [(3.5, 0), (5, 0), (5, 2.75), (3.5, 2.75)]
+
+world6.addPolygon(polygon1)
+world6.addPolygon(polygon2)
+world6.addPolygon(polygon3)
+
 #world.addLine((0, 2.5), (3, 2.5))
 
 world0.calcFreeLines()
@@ -1193,18 +1335,22 @@ world3.drawScene()
 world4.calcFreeLines()
 world4.drawScene()
 
+world5.calcFreeLines()
+world5.drawScene()
 
+world6.calcFreeLines()
+world6.drawScene()
 
 
 #%%
 reminders = [
      "Is there a better way (cos()) to handle parallelism in isLineInsideEdgeAngle()?",
-     "OVERLAPPING LINE SEGMENTS!\n\n To handle 'unions', make n x n mat of 0s, check for cancelling, etc.",
      "REMOVE SHAPELY? NOT REALLY USING IT THAT MUCH!",
-     "Pruning of lines that intersect obj at CONTACT verts.",
+     "Pruning of lines that intersect obj at CONTACT verts. (I forget what EXACTLY this meant)",
      "Pruning of segments outside convex hull.",
-     "Replace RB Tree with my own, or one with better licensing!",
-     "Checking sweepline.y in addition to sweepline.x when deciding whether an intersection happens in the past or future!"
+     "Replace RB Tree with my own, or one with better licensing!"
+     "Right now, swapDir() side effect in findIntersections(). Should this be changed?",
+     "All of this 'is (not) None' checking for the half-edge structure should be fixed!"
      ]
 
 for reminder in reminders:
