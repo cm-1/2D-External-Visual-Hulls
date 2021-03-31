@@ -63,7 +63,7 @@ def findIntersections(segments):
     
         
     while len(q) > 0:
-        if eventCount == 35:
+        if eventCount == 31:
             print("here!")
         print("\nEvents:", eventCount)
         eventCount += 1
@@ -156,9 +156,11 @@ def findIntersections(segments):
                 newInt = predSeg.intersection(succSeg);
                 onFirstSegment = newInt.meetS > -EQUAL_THRESHOLD and newInt.meetS < predSeg.length + EQUAL_THRESHOLD
                 onSecondSegment = newInt.meetT > -EQUAL_THRESHOLD and newInt.meetT < succSeg.length + EQUAL_THRESHOLD
-                
-                if newInt.doMeet and onFirstSegment and onSecondSegment and newInt.meetPt[0] > sweepLine.x:
-                    intEvent = MySweepEvent(succInt.meetPt[0], succInt.meetPt[1], {predSeg, succSeg}, EventType.INTERSECTION, eventCount-1)
+                toTheRight = newInt.meetPt[0] > sweepLine.x + EQUAL_THRESHOLD
+                onSweepLine = (abs(newInt.meetPt[0] - sweepLine.x) < EQUAL_THRESHOLD)
+                higherOnSweepLine = onSweepLine and (newInt.meetPt[1] > sweepLine.y + EQUAL_THRESHOLD)
+                if newInt.doMeet and onFirstSegment and onSecondSegment and (toTheRight or higherOnSweepLine):
+                    intEvent = MySweepEvent(newInt.meetPt[0], newInt.meetPt[1], {predSeg, succSeg}, EventType.INTERSECTION, eventCount-1)
                     print("\tintEvent:", intEvent)
                     heapq.heappush(q, intEvent) # RBTODO
             for sThing in t.valueList():
@@ -203,8 +205,10 @@ def findIntersections(segments):
                 predInt = minSeg.intersection(predSeg);
                 onFirstSegment = predInt.meetS > -EQUAL_THRESHOLD and predInt.meetS < minSeg.length + EQUAL_THRESHOLD
                 onSecondSegment = predInt.meetT > -EQUAL_THRESHOLD and predInt.meetT < predSeg.length + EQUAL_THRESHOLD
-                
-                if predInt.doMeet and onFirstSegment and onSecondSegment:
+                toTheRight = predInt.meetPt[0] > sweepLine.x + EQUAL_THRESHOLD
+                onSweepLine = (abs(predInt.meetPt[0] - sweepLine.x) < EQUAL_THRESHOLD)
+                higherOnSweepLine = onSweepLine and (predInt.meetPt[1] > sweepLine.y + EQUAL_THRESHOLD)
+                if predInt.doMeet and onFirstSegment and onSecondSegment and (toTheRight or higherOnSweepLine):
                     intEvent = MySweepEvent(predInt.meetPt[0], predInt.meetPt[1], {minSeg, predSeg}, EventType.INTERSECTION, eventCount-1)
                     if intEvent != p and (intEvent.x - sweepLine.x) > -EQUAL_THRESHOLD:
                         print("\tintEvent:", intEvent)
@@ -215,8 +219,10 @@ def findIntersections(segments):
                 succInt = maxSeg.intersection(succSeg);
                 onFirstSegment = succInt.meetS > -EQUAL_THRESHOLD and succInt.meetS < maxSeg.length + EQUAL_THRESHOLD
                 onSecondSegment = succInt.meetT > -EQUAL_THRESHOLD and succInt.meetT < succSeg.length + EQUAL_THRESHOLD
-                
-                if succInt.doMeet and onFirstSegment and onSecondSegment:
+                toTheRight = succInt.meetPt[0] > sweepLine.x + EQUAL_THRESHOLD
+                onSweepLine = (abs(succInt.meetPt[0] - sweepLine.x) < EQUAL_THRESHOLD)
+                higherOnSweepLine = onSweepLine and (succInt.meetPt[1] > sweepLine.y + EQUAL_THRESHOLD)
+                if succInt.doMeet and onFirstSegment and onSecondSegment and (toTheRight or higherOnSweepLine):
                     intEvent = MySweepEvent(succInt.meetPt[0], succInt.meetPt[1], {maxSeg, succSeg}, EventType.INTERSECTION, eventCount-1)
                     if intEvent != p and (intEvent.x - sweepLine.x) > -EQUAL_THRESHOLD:
                         print("\tintEvent:", intEvent)
@@ -942,7 +948,7 @@ world2.addPolygon(polygon2)
 
 polygon1 = [(0, 2), (1,1), (2,2), (1,0)]
 polygon2 = [(3,3), (4,2), (5,3)]
-polygon2 = [(p[0] - 3, p[1]) for p in polygon2]
+#polygon2 = [(p[0] - 3, p[1]) for p in polygon2]
 world3.addPolygon(polygon1)
 world3.addPolygon(polygon2)
 
@@ -958,12 +964,12 @@ world4.addPolygon(polygon4)
 
 #world.addLine((0, 2.5), (3, 2.5))
 
+world0.calcFreeLines()
+world0.drawScene()
 
 world2.calcFreeLines()
 world2.drawScene()
 
-world0.calcFreeLines()
-world0.drawScene()
 
 world1.calcFreeLines()
 world1.drawScene()
@@ -978,7 +984,6 @@ world4.drawScene()
 
 
 
-
 #%%
 reminders = [
      "Is there a better way (cos()) to handle parallelism in isLineInsideEdgeAngle()?",
@@ -986,7 +991,8 @@ reminders = [
      "REMOVE SHAPELY? NOT REALLY USING IT THAT MUCH!",
      "Pruning of lines that intersect obj at CONTACT verts.",
      "Pruning of segments outside convex hull.",
-     "Replace RB Tree with my own, or one with better licensing!"
+     "Replace RB Tree with my own, or one with better licensing!",
+     "Checking sweepline.y in addition to sweepline.x when deciding whether an intersection happens in the past or future!"
      ]
 
 for reminder in reminders:
