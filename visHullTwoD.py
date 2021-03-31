@@ -1,5 +1,3 @@
-import matplotlib.pyplot as plt
-
 import numpy as np
 import math
 from enum import Enum
@@ -16,7 +14,6 @@ class EventType(Enum):
     INTERSECTION = 1
     RIGHT = 2
  
-#%%
 
 class SweepLine:
     def __init__(self, x, y, eventType):
@@ -39,6 +36,18 @@ class Face:
         self.halfEdge = halfEdge
         self.index = index
         self.visualNumber = -1
+    def getCoords(self):
+        v = self.halfEdge.headVertex.position
+        vertices = [v]
+        origHE = self.halfEdge
+        he = self.halfEdge.next
+        while he != origHE:
+            if he.headVertex is None:
+                break
+            v = he.headVertex.position
+            vertices.append(v)
+            he = he.next
+        return np.array(vertices)
     def __eq__(self, other):
         return self.index == other.index
     def __hash__(self):
@@ -95,354 +104,6 @@ class HalfEdgeStructure:
     
     def isExteriorFace(self, face):
         return face.index == self._exteriorFaceIndex
-
-    
-
-# Sweep line implementation!
-def findIntersections(segments):
-    t = RedBlackTree()
-    
-    q = []
-    # I'm pretty sure this next line's not needed, but I'm not taking chances right now. In a hurry.
-    heapq.heapify(q)
-    
-    sortableSegments = []
-    sweepLine = SweepLine(0, 0, EventType.LEFT)
-    
-    for i in range(len(segments)):
-        s = segments[i]
-        pL = s.p0
-        pR = s.p1
-        shouldSwap = False
-        if pR[0] < pL[0]:
-            shouldSwap = True
-        elif pR[0] == pL[0]:
-            if pR[1] < pL[1]:
-                shouldSwap = True
-        
-        if shouldSwap:
-            s.swapDir()
-        
-        sortableSegment = MySortableSegment(s, sweepLine, i)
-        sortableSegments.append(sortableSegment)
-        
-        lEnd = MySweepEvent(s.p0[0], s.p0[1], {sortableSegment}, EventType.LEFT)
-        rEnd = MySweepEvent(s.p1[0], s.p1[1], {sortableSegment}, EventType.RIGHT)
-        
-        heapq.heappush(q, lEnd)
-        heapq.heappush(q, rEnd)
-        
-    intersections = []  
-    partitionMesh = HalfEdgeStructure()
-
-    eventCount = 0
-    
-        
-    while len(q) > 0:
-        # if eventCount == 31:
-        #     print("here!")
-        print("\nEvents:", eventCount)
-        eventCount += 1
-        p = heapq.heappop(q)
-        print("Event: ", p)
-        
-        # print("Intersections({0}):".format(len(intersections)))
-        # for isec in intersections:
-        #     print(isec, end=", ")
-        # print()
-        
-        if p.eventType == EventType.INTERSECTION:
-            while q[0] == p:
-                # print("merging:", [s.index for s in p.segments], ",", [s.index for s in q[0].segments])
-                pToMerge = heapq.heappop(q)
-                p.merge(pToMerge)
-                # print("merged segSet:", [s.index for s in p.segments])
-        sweepLine.x = p.x
-        sweepLine.y = p.y
-        sweepLine.eventType = p.eventType
-        
-        debugList = []
-                
-        if p.eventType == EventType.LEFT:
-            s = next(iter(p.segments))
-            
-            sNode = t.add(s)
-            s.node = sNode
-            sNode.subscribers.add(s)
-            
-            succ = t.successor(sNode)
-            pred = t.predecessor(sNode)
-            if succ:
-                succSeg = succ.value
-                # print("succSeg:", succSeg)
-                succInt = s.intersection(succSeg)
-                onFirstSegment = succInt.meetS > -EQUAL_THRESHOLD and succInt.meetS < s.length + EQUAL_THRESHOLD
-                onSecondSegment = succInt.meetT > -EQUAL_THRESHOLD and succInt.meetT < succSeg.length + EQUAL_THRESHOLD
-                
-                if succInt.doMeet and onFirstSegment and onSecondSegment:
-                    intEvent = MySweepEvent(succInt.meetPt[0], succInt.meetPt[1], {s, succSeg}, EventType.INTERSECTION, eventCount-1)
-                    # print("\tintEvent:", intEvent)
-                    heapq.heappush(q, intEvent)
-
-            if pred:
-                predSeg = pred.value
-                # print("predSeg:", predSeg)
-                predInt = s.intersection(predSeg)
-                onFirstSegment = predInt.meetS > -EQUAL_THRESHOLD and predInt.meetS < s.length + EQUAL_THRESHOLD
-                onSecondSegment = predInt.meetT > -EQUAL_THRESHOLD and predInt.meetT < predSeg.length + EQUAL_THRESHOLD
-                
-                if predInt.doMeet and onFirstSegment and onSecondSegment:
-                    intEvent = MySweepEvent(predInt.meetPt[0], predInt.meetPt[1], {s, predSeg}, EventType.INTERSECTION, eventCount-1)
-                    # print("\tintEvent:", intEvent)
-                    heapq.heappush(q, intEvent)
-                    
-        elif p.eventType == EventType.RIGHT:
-            s = next(iter(p.segments))
-            
-            sNode = s.node
-            
-            pred = t.predecessor(sNode)
-            succ = t.successor(sNode)
-            
-            t.removeGivenNode(sNode)
-
-            if (s.forwardHalfEdge is not None) and (s.forwardHalfEdge.headVertex is None): #possibly need to check x coords of pair.headVertex against current x coords?
-                debugList.append(s)    
-                '''halfEdge = s.forwardHalfEdge    
-                halfEdge.prev.next = halfEdge.pair.next
-                halfEdge.pair.next.prev = halfEdge.prev
-
-                keptFace = halfEdge.leftFace
-                # If this half edge produced two new faces, one of them must be removed.
-                if halfEdge.prev.leftFace != halfEdge.pair.next.leftFace:
-                    if not partitionMesh.isExteriorFace(halfEdge.leftFace):
-                        partitionMesh.removeFace(halfEdge.leftFace)
-                        keptFace = halfEdge.pair.next.leftFace
-                        halfEdge.prev.leftFace = keptFace
-                    else: # We can't remove the exterior face.
-                        partitionMesh.removeFace(halfEdge.pair.leftFace)
-                        keptFace = halfEdge.prev.leftFace
-                        halfEdge.pair.next.leftFace = keptFace
-                # If the kept face's half edge is the one that we're deleting,
-                # we need to replace that reference
-                elif keptFace.halfEdge == halfEdge:
-                    keptFace.halfEdge = halfEdge.pair.next
-                
-                partitionMesh.removeHalfEdgePair(halfEdge)'''
-            
-            if pred and succ:
-                predSeg = pred.value
-                succSeg = succ.value
-                # print("predSeg:", predSeg)
-                # print("succSeg:", succSeg)
-                newInt = predSeg.intersection(succSeg)
-                onFirstSegment = newInt.meetS > -EQUAL_THRESHOLD and newInt.meetS < predSeg.length + EQUAL_THRESHOLD
-                onSecondSegment = newInt.meetT > -EQUAL_THRESHOLD and newInt.meetT < succSeg.length + EQUAL_THRESHOLD
-                toTheRight = newInt.meetPt[0] > sweepLine.x + EQUAL_THRESHOLD
-                onSweepLine = (abs(newInt.meetPt[0] - sweepLine.x) < EQUAL_THRESHOLD)
-                higherOnSweepLine = onSweepLine and (newInt.meetPt[1] > sweepLine.y + EQUAL_THRESHOLD)
-                if newInt.doMeet and onFirstSegment and onSecondSegment and (toTheRight or higherOnSweepLine):
-                    intEvent = MySweepEvent(newInt.meetPt[0], newInt.meetPt[1], {predSeg, succSeg}, EventType.INTERSECTION, eventCount-1)
-                    # print("\tintEvent:", intEvent)
-                    heapq.heappush(q, intEvent)
-            # for sThing in t.valueList():
-            #     if not t.isMatchingNodeInTree(sThing.node):
-            #         print("Problem for", sThing, "node!!!")
-        
-        else: # It's an intersection
-            newElem = np.array((p.x, p.y))
-            intersections.append(newElem)
-            intSegments = deque(sorted(p.segments))
-            
-            # These segments will "become" min and max after the swaps.
-            maxSeg = intSegments[0]
-            minSeg = intSegments[-1]
-
-
-            extendBeforeInt = []
-            extendAfterInt = []
-
-            for intSeg in intSegments:
-                x0Diff = p.x - intSeg.p0[0]
-                y0Diff = p.y - intSeg.p0[1]
-                x1Diff = intSeg.p1[0] - p.x
-                y1Diff = intSeg.p1[1] - p.y
-                x0Before = x0Diff > EQUAL_THRESHOLD
-                x0Equal = abs(x0Diff) < EQUAL_THRESHOLD
-                y0Before = y0Diff > EQUAL_THRESHOLD
-
-                x1After = x1Diff > EQUAL_THRESHOLD
-                x1Equal = abs(x1Diff) < EQUAL_THRESHOLD
-                y1After = y1Diff > EQUAL_THRESHOLD
-                
-                # Note: Before and After not mutually exclusive here.
-                before = x0Before or (x0Equal and y0Before)
-                after = x1After or (x1Equal and y1After)
-
-                if before and intSeg.forwardHalfEdge:
-                    extendBeforeInt.append(intSeg)
-                if after:
-                    extendAfterInt.insert(0, intSeg)  
-            
-            newVertex = Vertex((p.x, p.y), None)
-            segIndex = 0
-            while newVertex.vertexID < 0 and segIndex < len(extendBeforeInt):
-                vertSeg = extendBeforeInt[segIndex]
-                if vertSeg.p1Index >= 0 and abs(vertSeg.p1[0] - p.x) < EQUAL_THRESHOLD and abs(vertSeg.p1[1] - p.y) < EQUAL_THRESHOLD:
-                    newVertex.vertexID = vertSeg.p1Index
-                segIndex += 1
-            segIndex = 0
-            while newVertex.vertexID < 0 and segIndex < len(extendAfterInt):
-                vertSeg = extendAfterInt[segIndex]
-                if vertSeg.p0Index >= 0 and abs(vertSeg.p0[0] - p.x) < EQUAL_THRESHOLD and abs(vertSeg.p0[1] - p.y) < EQUAL_THRESHOLD:
-                    newVertex.vertexID = vertSeg.p0Index
-                segIndex += 1
-            partitionMesh.verts.append(newVertex)
-            if partitionMesh.vertexOnShape is None and newVertex.vertexID >= 0:
-                partitionMesh.vertexOnShape = newVertex
-
-            print("Before Segs:")
-            for bs in extendBeforeInt:
-                print("\t", bs)
-            print("After Segs:")
-            for ps in extendAfterInt:
-                print("\t", ps)
-
-            # Swap order in tree
-            while len(intSegments) >= 2:
-                s0 = intSegments.popleft()
-                s1 = intSegments.pop()
-                tempNode = s0.node
-                s0.node = s1.node
-                s1.node = tempNode
-                s0.node.subscribers.remove(s1)
-                s0.node.subscribers.add(s0)
-                s1.node.subscribers.remove(s0)
-                s1.node.subscribers.add(s1)
-                s0.node.value = s0
-                s1.node.value = s1
-                
-                s0.lastIntersectionY = p.y
-                s1.lastIntersectionY = p.y
-            
-            # print("maxSeg:", maxSeg)
-            # print("minSeg:", minSeg)
-            
-            pred = t.predecessor(minSeg.node)
-            succ = t.successor(maxSeg.node)
-
-
-            for i in range(len(extendBeforeInt)):
-                preSeg = extendBeforeInt[i]
-                preSeg.forwardHalfEdge.headVertex = newVertex
-                if i < len(extendBeforeInt) - 1:
-                    nextHalfEdge = extendBeforeInt[i+1].forwardHalfEdge.pair
-                    preSeg.forwardHalfEdge.next = nextHalfEdge
-                    nextHalfEdge.prev = preSeg.forwardHalfEdge
-
-            newForwardHalfEdges = []
-            for i in range(len(extendAfterInt)):
-                newForwardHalfEdges.append(partitionMesh.createNewPairOfHalfEdges(newVertex, not extendAfterInt[i].increasesToTheRight))
-
-            # First two cases are where we're at a "corner" on the edge the set of regions.
-            # Third case is when there are lines both before and after the intersection.
-            if len(extendAfterInt) == 0:
-                maxPreHalfEdge = extendBeforeInt[-1].forwardHalfEdge
-                maxPreHalfEdge.next = extendBeforeInt[0].forwardHalfEdge.pair
-                extendBeforeInt[0].forwardHalfEdge.pair.pev = maxPreHalfEdge
-                newVertex.outgoingHalfEdge = extendBeforeInt[0].forwardHalfEdge.pair
-            elif len(extendBeforeInt) == 0:
-                newForwardHalfEdges[0].pair.next = newForwardHalfEdges[-1]
-                newForwardHalfEdges[-1].prev = newForwardHalfEdges[0].pair
-                halfEdgePred = pred
-                halfEdgeSucc = succ
-                isOutsideFaceFound = False
-                while halfEdgePred is not None and not isOutsideFaceFound:
-                    if halfEdgePred.value.forwardHalfEdge is not None:
-                        sharedFace = halfEdgePred.value.forwardHalfEdge.leftFace
-                        newForwardHalfEdges[-1].leftFace = sharedFace
-                        newForwardHalfEdges[0].pair.leftFace = sharedFace
-                        isOutsideFaceFound = True
-                    else:
-                        halfEdgePred = t.predecessor(halfEdgePred)
-                while halfEdgeSucc is not None and not isOutsideFaceFound:
-                    if halfEdgeSucc.value.forwardHalfEdge is not None:
-                        sharedFace = halfEdgeSucc.value.forwardHalfEdge.leftFace
-                        newForwardHalfEdges[-1].leftFace = sharedFace
-                        newForwardHalfEdges[0].pair.leftFace = sharedFace
-                        isOutsideFaceFound = True
-                    else:
-                        halfEdgeSucc = t.predecessor(halfEdgeSucc)
-                        
-                else:
-                    partitionMesh.assignExteriorFace(newForwardHalfEdges[-1])
-                    partitionMesh.assignExteriorFace(newForwardHalfEdges[0].pair)
-                
-                newVertex.outgoingHalfEdge = newForwardHalfEdges[0]
-            else:
-                newVertex.outgoingHalfEdge = extendBeforeInt[0].forwardHalfEdge.pair
-
-                extendBeforeInt[-1].forwardHalfEdge.next = newForwardHalfEdges[-1]
-                newForwardHalfEdges[-1].prev = extendBeforeInt[-1].forwardHalfEdge
-
-                newForwardHalfEdges[0].pair.next = extendBeforeInt[0].forwardHalfEdge.pair
-                extendBeforeInt[0].forwardHalfEdge.pair.prev = newForwardHalfEdges[0].pair
-
-                newForwardHalfEdges[-1].leftFace = newForwardHalfEdges[-1].prev.leftFace
-                newForwardHalfEdges[0].pair.leftFace = newForwardHalfEdges[0].pair.next.leftFace
-
-            for i in range(len(extendAfterInt) - 1):
-                newForwardHalfEdges[i+1].pair.next = newForwardHalfEdges[i]
-                newForwardHalfEdges[i].prev = newForwardHalfEdges[i+1].pair 
-
-                newFace = partitionMesh.createNewFace(newForwardHalfEdges[i])
-
-                newForwardHalfEdges[i].leftFace = newFace
-                newForwardHalfEdges[i].prev.leftFace = newFace
-                
-            for i in range(len(extendAfterInt)):
-                extendAfterInt[i].forwardHalfEdge = newForwardHalfEdges[i]
-            
-            
-            if pred:
-                predSeg = pred.value
-                # print("predSeg:", predSeg)
-                predInt = minSeg.intersection(predSeg)
-                onFirstSegment = predInt.meetS > -EQUAL_THRESHOLD and predInt.meetS < minSeg.length + EQUAL_THRESHOLD
-                onSecondSegment = predInt.meetT > -EQUAL_THRESHOLD and predInt.meetT < predSeg.length + EQUAL_THRESHOLD
-                toTheRight = predInt.meetPt[0] > sweepLine.x + EQUAL_THRESHOLD
-                onSweepLine = (abs(predInt.meetPt[0] - sweepLine.x) < EQUAL_THRESHOLD)
-                higherOnSweepLine = onSweepLine and (predInt.meetPt[1] > sweepLine.y + EQUAL_THRESHOLD)
-                if predInt.doMeet and onFirstSegment and onSecondSegment and (toTheRight or higherOnSweepLine):
-                    intEvent = MySweepEvent(predInt.meetPt[0], predInt.meetPt[1], {minSeg, predSeg}, EventType.INTERSECTION, eventCount-1)
-                    if intEvent != p and (intEvent.x - sweepLine.x) > -EQUAL_THRESHOLD:
-                        # print("\tintEvent:", intEvent)
-                        heapq.heappush(q, intEvent)
-            if succ:
-                succSeg = succ.value
-                # print("succSeg:", succSeg)
-                succInt = maxSeg.intersection(succSeg)
-                onFirstSegment = succInt.meetS > -EQUAL_THRESHOLD and succInt.meetS < maxSeg.length + EQUAL_THRESHOLD
-                onSecondSegment = succInt.meetT > -EQUAL_THRESHOLD and succInt.meetT < succSeg.length + EQUAL_THRESHOLD
-                toTheRight = succInt.meetPt[0] > sweepLine.x + EQUAL_THRESHOLD
-                onSweepLine = (abs(succInt.meetPt[0] - sweepLine.x) < EQUAL_THRESHOLD)
-                higherOnSweepLine = onSweepLine and (succInt.meetPt[1] > sweepLine.y + EQUAL_THRESHOLD)
-                if succInt.doMeet and onFirstSegment and onSecondSegment and (toTheRight or higherOnSweepLine):
-                    intEvent = MySweepEvent(succInt.meetPt[0], succInt.meetPt[1], {maxSeg, succSeg}, EventType.INTERSECTION, eventCount-1)
-                    if intEvent != p and (intEvent.x - sweepLine.x) > -EQUAL_THRESHOLD:
-                        # print("\tintEvent:", intEvent)
-                        heapq.heappush(q, intEvent)
-        # t.printTree()
-        # print("---")
-        # print(t.valueList())
-        
-        # for sThing in t.valueList():
-        #     if not t.isMatchingNodeInTree(sThing.node):
-        #         print("Problem for", sThing, "node!!!")
-    print("DEBUG LIST:")
-    for s in debugList:
-        print("\t", s)
-    return partitionMesh
         
 class MySweepEvent:
     def __init__(self, x, y, segments, eventType, debugID = -1):
@@ -713,6 +374,9 @@ class Scene:
         self.minY = math.inf
         self.maxY = -math.inf
         
+        self.partitionMesh = None
+        self.drawableFaces = []
+        
     def createActiveSegments(self, index0, index1):
         v00 = self.vertices[self.prevIndices[index0]]
         v01 = self.vertices[index0]
@@ -925,6 +589,7 @@ class Scene:
                             dictOfInterest[cKey] = [newSeg]
         self.unifySegments(nonVertLineDict, False)
         self.unifySegments(vertLineDict, True)
+        self.calculateVisualHull()
             
                 
     def unifySegments(self, segmentDictionary, isVertical):
@@ -1102,70 +767,27 @@ class Scene:
         newP1 = ln.p0 + tForward*ln.dir
         return (newP0, newP1)
     
-        
+    def calculateVisualHull(self):      
+        self.partitionMesh = self.findIntersections()
     
-    def drawScene(self):
-        print("cwList:", self.cwList)
-        # Plot all polygons.
-        for obj in self.polygons:
-            x,y = obj.getSeparateXYs()
-            plt.fill(x,y, "#A0A0A0") # light grey fill
-            plt.plot(x,y, "#505050") # dark grey edges/outline
-        for ln in self.lines:
-            p0, p1 = self.sceneBorderHitPoints(ln)
-            plt.plot([p0[0], p1[0]], [p0[1], p1[1]], "k--")
-        for ln in self.activeSegments:
-            colString = "g"
-            if ln.activeType == SegmentType.A:
-                colString = "r"
-            elif ln.activeType == SegmentType.B:
-                colString = "b"
-                
-            # Magenta if vn increase to right (for vert lines) or down
-            # Cyan otherwise
-            colString2 = "c"
-            if ln.isVertical:
-                if (ln.p1[1] > ln.p0[1] and ln.increasesToTheRight) or (ln.p1[1] < ln.p0[1] and not ln.increasesToTheRight):
-                    colString2 = "m"
-            else:
-                if (ln.p1[0] > ln.p0[0] and ln.increasesToTheRight) or (ln.p1[0] < ln.p0[0] and not ln.increasesToTheRight):
-                    colString2 = "m"
-            plt.plot([ln.p0[0], ln.p1[0]], [ln.p0[1], ln.p1[1]], colString2)
-        
-        # !!!! Left off at event 21.
-        '''myPts = findIntersections(self.activeSegments)
-        print("Found: " , len(myPts), " intersections!")
-        plt.plot([myPt[0] for myPt in myPts], [myPt[1] for myPt in myPts], 'go')'''
-        partitionMesh = findIntersections(self.activeSegments)
-        '''for halfEdge in partitionMesh.halfEdges:
-            if halfEdge.headVertex is not None and halfEdge.pair.headVertex is not None:
-                v0 = halfEdge.headVertex.position
-                v1 = halfEdge.pair.headVertex.position
-                plt.plot([v0[0], v1[0]], [v0[1], v1[1]], "r--")
-            else:
-                print("Some problem")'''
         correctedFaces = set()
-        facesToDraw = []
-        for f in partitionMesh.faces:
-            if partitionMesh.isExteriorFace(f):
+        self.drawableFaces = []
+        for f in self.partitionMesh.faces:
+            if self.partitionMesh.isExteriorFace(f):
                 continue
             he = f.halfEdge
             if he.headVertex is None:
                 continue
             correctedFaces.add(f)
             v = he.headVertex.position
-            xs = [v[0]]
-            ys = [v[1]]
             origHE = he
             he = he.next
             while he != origHE:
                 if he.headVertex is None:
                     break
                 v = he.headVertex.position
-                xs.append(v[0])
-                ys.append(v[1])
                 he = he.next
-            facesToDraw.append({"face":f,"xs": xs,"ys":ys})
+            self.drawableFaces.append(f)
         
         # We know that the below vertex is on the shape.
         # Now we need to find out which of its faces has visual number 0.
@@ -1174,7 +796,7 @@ class Scene:
         # So, the "bisector" of its two edges points into the shape.
         # We just need to find two half edges that "enclose" it.
         # That would thus mean they also enclose that part of the shape.
-        vertOnShape = partitionMesh.vertexOnShape
+        vertOnShape = self.partitionMesh.vertexOnShape
         vertIndex = vertOnShape.vertexID
         v0 = self.vertices[self.prevIndices[vertIndex]]
         v1 = self.vertices[vertIndex]
@@ -1229,7 +851,7 @@ class Scene:
                 currFace["face"].visualNumber = vn
                 halfEdge = currFace["face"].halfEdge
                 adjFace = halfEdge.pair.leftFace
-                if (not partitionMesh.isExteriorFace(adjFace)) and (adjFace in correctedFaces):
+                if (not self.partitionMesh.isExteriorFace(adjFace)) and (adjFace in correctedFaces):
                     vnChange = -1 if halfEdge.increasesLeft else 1
                     stack.append({"face": adjFace, "visualNumber": vn+vnChange})
                     
@@ -1239,153 +861,356 @@ class Scene:
                     if halfEdge is None:
                         break
                     adjFace = halfEdge.pair.leftFace
-                    if (not partitionMesh.isExteriorFace(adjFace)) and (adjFace in correctedFaces):
+                    if (not self.partitionMesh.isExteriorFace(adjFace)) and (adjFace in correctedFaces):
                         vnChange = -1 if halfEdge.increasesLeft else 1
                         stack.append({"face": adjFace, "visualNumber": vn+vnChange})
-                    halfEdge = halfEdge.next
+                    halfEdge = halfEdge.next    
+    
         
-        colours = ["k", "r", "g", "b", "y"]
-        for f in facesToDraw:
-            regionColour = colours[min(f["face"].visualNumber, len(colours) - 1)]
-            plt.fill(f["xs"], f["ys"], regionColour)
+    # Sweep line implementation!
+    def findIntersections(self):
+        t = RedBlackTree()
+        
+        q = []
+        # I'm pretty sure this next line's not needed, but I'm not taking chances right now. In a hurry.
+        heapq.heapify(q)
+        
+        sortableSegments = []
+        sweepLine = SweepLine(0, 0, EventType.LEFT)
+        
+        for i in range(len(self.activeSegments)):
+            s = self.activeSegments[i]
+            pL = s.p0
+            pR = s.p1
+            shouldSwap = False
+            if pR[0] < pL[0]:
+                shouldSwap = True
+            elif pR[0] == pL[0]:
+                if pR[1] < pL[1]:
+                    shouldSwap = True
             
-        convex = []
-        concave = []
-        for i in range(self.vertices.shape[0]):
-            if self.isVertexConcave(i):
-                concave.append(self.vertices[i])
-            else:
-                convex.append(self.vertices[i])
-        npConvex = np.array(convex)
-        npConcave = np.array(concave)
+            if shouldSwap:
+                s.swapDir()
+            
+            sortableSegment = MySortableSegment(s, sweepLine, i)
+            sortableSegments.append(sortableSegment)
+            
+            lEnd = MySweepEvent(s.p0[0], s.p0[1], {sortableSegment}, EventType.LEFT)
+            rEnd = MySweepEvent(s.p1[0], s.p1[1], {sortableSegment}, EventType.RIGHT)
+            
+            heapq.heappush(q, lEnd)
+            heapq.heappush(q, rEnd)
+            
+        intersections = []  
+        partitionMesh = HalfEdgeStructure()
+    
+        eventCount = 0
         
-        '''
-        for maxSeg in self.activeSegments:
-            for succSeg in self.activeSegments:
-                succInt = maxSeg.intersection(succSeg)
-                onFirstSegment = succInt.meetS > -EQUAL_THRESHOLD and succInt.meetS < maxSeg.length + EQUAL_THRESHOLD
-                onSecondSegment = succInt.meetT > -EQUAL_THRESHOLD and succInt.meetT < succSeg.length + EQUAL_THRESHOLD
-                if succInt.doMeet and onFirstSegment and onSecondSegment:
-                    plt.plot([succInt.meetPt[0]], [succInt.meetPt[1]], 'ko')
-        '''
-        '''if npConvex.shape[0] > 0:
-            plt.plot(npConvex[:, 0], npConvex[:, 1], 'bo')
-        if npConcave.shape[0] > 0:
-            plt.plot(npConcave[:, 0], npConcave[:, 1], 'go')'''
-        plt.show()
+            
+        while len(q) > 0:
+            # if eventCount == 31:
+            #     print("here!")
+            print("\nEvents:", eventCount)
+            eventCount += 1
+            p = heapq.heappop(q)
+            print("Event: ", p)
+            
+            # print("Intersections({0}):".format(len(intersections)))
+            # for isec in intersections:
+            #     print(isec, end=", ")
+            # print()
+            
+            if p.eventType == EventType.INTERSECTION:
+                while q[0] == p:
+                    # print("merging:", [s.index for s in p.segments], ",", [s.index for s in q[0].segments])
+                    pToMerge = heapq.heappop(q)
+                    p.merge(pToMerge)
+                    # print("merged segSet:", [s.index for s in p.segments])
+            sweepLine.x = p.x
+            sweepLine.y = p.y
+            sweepLine.eventType = p.eventType
+            
+            debugList = []
+                    
+            if p.eventType == EventType.LEFT:
+                s = next(iter(p.segments))
+                
+                sNode = t.add(s)
+                s.node = sNode
+                sNode.subscribers.add(s)
+                
+                succ = t.successor(sNode)
+                pred = t.predecessor(sNode)
+                if succ:
+                    succSeg = succ.value
+                    # print("succSeg:", succSeg)
+                    succInt = s.intersection(succSeg)
+                    onFirstSegment = succInt.meetS > -EQUAL_THRESHOLD and succInt.meetS < s.length + EQUAL_THRESHOLD
+                    onSecondSegment = succInt.meetT > -EQUAL_THRESHOLD and succInt.meetT < succSeg.length + EQUAL_THRESHOLD
+                    
+                    if succInt.doMeet and onFirstSegment and onSecondSegment:
+                        intEvent = MySweepEvent(succInt.meetPt[0], succInt.meetPt[1], {s, succSeg}, EventType.INTERSECTION, eventCount-1)
+                        # print("\tintEvent:", intEvent)
+                        heapq.heappush(q, intEvent)
     
-world0 = Scene()
-world1 = Scene()
-world2 = Scene()
-world3 = Scene()
-world4 = Scene()
-world5 = Scene()
-world6 = Scene()
-
-
-# These are the tris from Petitjean's diagram
-polygon1 = [(0, 0), (2.25, 0.5), (1.25, 2.3)] # [(0,3),(1,1),(3,0),(4,0),(3,4)]
-polygon2 = [(1.15, 3.15), (4, 4), (0.9, 5.25)] # [(1,4),(2,5),(2,1),(1,3)]
-polygon3 = [(3, 0.7), (4.85, 1.75), (4.85, 3.4)]
-
-world0.addPolygon(polygon1)
-world0.addPolygon(polygon2)
-world0.addPolygon(polygon3)
-#world0.addPolygon(polygon4)
-
-polygon1 = [(0, 0), (5, 0), (5, 5), (4, 5), (4, 3), (1, 3), (1, 5), (0, 5)]
-world1.addPolygon(polygon1)
-
-polygon1 = [(0, 0), (5, 0), (5, 3), (4, 3), (4, 5), (1, 5), (1, 3), (0, 3)]
-polygon2 = [(1, 7), (3, 7), (5, 9), (4, 11), (4, 9), (1, 8), (2, 10), (0, 10)]
-world2.addPolygon(polygon1)
-world2.addPolygon(polygon2)
-
-polygon1 = [(0, 2), (1,1), (2,2), (1,0)]
-polygon2 = [(3,3), (4,2), (5,3)]
-#polygon2 = [(p[0] - 3, p[1]) for p in polygon2]
-world3.addPolygon(polygon1)
-world3.addPolygon(polygon2)
-
-polygon1 = [(0, 7), (2.25, 5), (1.25, 4), (5, 5)] # [(0, 0), (2.25, 0.5), (1.25, 2.3)] # [(0,3),(1,1),(3,0),(4,0),(3,4)]
-polygon2 = [(1.15, -3.15), (4, -4), (2, -7), (0.9, -5.25)] #[(1.15, 3.15), (4, 4), (0.9, 5.25)] # [(1,4),(2,5),(2,1),(1,3)]
-polygon3 = [(3, 1), (3, 0.0), (4.85, 0.75), (4.85, 2.4), (5,4)] #[(3, 0.7), (4.85, 1.75), (4.85, 3.4)]
-polygon4 = [(-0.5, -1), (-0.5, 1.0), (0.5, 1), (0.5, -1)] #[(3, 0.7), (4.85, 1.75), (4.85, 3.4)]
-
-world4.addPolygon(polygon1)
-world4.addPolygon(polygon2)
-world4.addPolygon(polygon3)
-world4.addPolygon(polygon4)
-
-polygon1 = [(0, 0.6), (1.5, 0), (2.5, 1.25), (1.25, 0.75), (1.125, 1.8)]
-polygon2 = [(1.3, 2.25), (2.8, 2.8), (1.65, 3.125)]
-polygon3 = [(2.8, 1.25), (4.125, 0.25), (3.5, 2.0)]
-
-world5.addPolygon(polygon1)
-world5.addPolygon(polygon2)
-world5.addPolygon(polygon3)
-
-polygon1 = [(0,0), (2.5, 0), (0, 1.5)]
-polygon2 = [(0, 3.25), (5, 4.25), (0, 4.25)]
-polygon3 = [(3.5, 0), (5, 0), (5, 2.75), (3.5, 2.75)]
-
-world6.addPolygon(polygon1)
-world6.addPolygon(polygon2)
-world6.addPolygon(polygon3)
-
-#world.addLine((0, 2.5), (3, 2.5))
-
-world0.calcFreeLines()
-world0.drawScene()
-
-world2.calcFreeLines()
-world2.drawScene()
-
-
-world1.calcFreeLines()
-world1.drawScene()
-
-
-world3.calcFreeLines()
-world3.drawScene()
-
-world4.calcFreeLines()
-world4.drawScene()
-
-world5.calcFreeLines()
-world5.drawScene()
-
-world6.calcFreeLines()
-world6.drawScene()
-
-
-#%%
-reminders = [
-     "Is there a better way (cos()) to handle parallelism in isLineInsideEdgeAngle()?",
-     "REMOVE SHAPELY? NOT REALLY USING IT THAT MUCH!",
-     "Pruning of lines that intersect obj at CONTACT verts. (I forget what EXACTLY this meant)",
-     "Pruning of segments outside convex hull.",
-     "Replace RB Tree with my own, or one with better licensing!"
-     "Right now, swapDir() side effect in findIntersections(). Should this be changed?",
-     "All of this 'is (not) None' checking for the half-edge structure should be fixed!",
-     "Separate matplotlib part from the rest!"
-     ]
-
-for reminder in reminders:
-    sep = "==========="
-    print("\n" + sep + "\n" + reminder + "\n" + sep + "\n")
+                if pred:
+                    predSeg = pred.value
+                    # print("predSeg:", predSeg)
+                    predInt = s.intersection(predSeg)
+                    onFirstSegment = predInt.meetS > -EQUAL_THRESHOLD and predInt.meetS < s.length + EQUAL_THRESHOLD
+                    onSecondSegment = predInt.meetT > -EQUAL_THRESHOLD and predInt.meetT < predSeg.length + EQUAL_THRESHOLD
+                    
+                    if predInt.doMeet and onFirstSegment and onSecondSegment:
+                        intEvent = MySweepEvent(predInt.meetPt[0], predInt.meetPt[1], {s, predSeg}, EventType.INTERSECTION, eventCount-1)
+                        # print("\tintEvent:", intEvent)
+                        heapq.heappush(q, intEvent)
+                        
+            elif p.eventType == EventType.RIGHT:
+                s = next(iter(p.segments))
+                
+                sNode = s.node
+                
+                pred = t.predecessor(sNode)
+                succ = t.successor(sNode)
+                
+                t.removeGivenNode(sNode)
     
-# temp1 = np.array(polygon1)
-# temp2 = np.roll(np.arange(5, 5+temp1.shape[0]), -1, axis=0)
-# temp3 = np.roll(np.arange(5, 5+temp1.shape[0]), 1, axis=0)
-# ...
-# testVertices = np.empty((temp1.shape[0]), dtype=[("x", np.float64), ("y", np.float64), ("prevIndex", np.int), ("nextIndex", np.int)])
-# testVertices["x"] = temp1[:, 0]
-# testVertices["y"] = temp1[:, 1]
-# testVertices["prevIndex"] = temp2
-# testVertices["nextIndex"] = temp3
-# testVertices[3]["x"]
-# testVertices[["x", "y"]]
-# testVertices[0][["x", "y"]]
-# Does not work: np.dot(testVertices[2][["x", "y"]], testVertices[3][["x", "y"]])
-# The error msg: Can't cast from structure to non-structure, except if the structure only has a single field.
+                if (s.forwardHalfEdge is not None) and (s.forwardHalfEdge.headVertex is None): #possibly need to check x coords of pair.headVertex against current x coords?
+                    debugList.append(s)    
+                    '''halfEdge = s.forwardHalfEdge    
+                    halfEdge.prev.next = halfEdge.pair.next
+                    halfEdge.pair.next.prev = halfEdge.prev
+    
+                    keptFace = halfEdge.leftFace
+                    # If this half edge produced two new faces, one of them must be removed.
+                    if halfEdge.prev.leftFace != halfEdge.pair.next.leftFace:
+                        if not partitionMesh.isExteriorFace(halfEdge.leftFace):
+                            partitionMesh.removeFace(halfEdge.leftFace)
+                            keptFace = halfEdge.pair.next.leftFace
+                            halfEdge.prev.leftFace = keptFace
+                        else: # We can't remove the exterior face.
+                            partitionMesh.removeFace(halfEdge.pair.leftFace)
+                            keptFace = halfEdge.prev.leftFace
+                            halfEdge.pair.next.leftFace = keptFace
+                    # If the kept face's half edge is the one that we're deleting,
+                    # we need to replace that reference
+                    elif keptFace.halfEdge == halfEdge:
+                        keptFace.halfEdge = halfEdge.pair.next
+                    
+                    partitionMesh.removeHalfEdgePair(halfEdge)'''
+                
+                if pred and succ:
+                    predSeg = pred.value
+                    succSeg = succ.value
+                    # print("predSeg:", predSeg)
+                    # print("succSeg:", succSeg)
+                    newInt = predSeg.intersection(succSeg)
+                    onFirstSegment = newInt.meetS > -EQUAL_THRESHOLD and newInt.meetS < predSeg.length + EQUAL_THRESHOLD
+                    onSecondSegment = newInt.meetT > -EQUAL_THRESHOLD and newInt.meetT < succSeg.length + EQUAL_THRESHOLD
+                    toTheRight = newInt.meetPt[0] > sweepLine.x + EQUAL_THRESHOLD
+                    onSweepLine = (abs(newInt.meetPt[0] - sweepLine.x) < EQUAL_THRESHOLD)
+                    higherOnSweepLine = onSweepLine and (newInt.meetPt[1] > sweepLine.y + EQUAL_THRESHOLD)
+                    if newInt.doMeet and onFirstSegment and onSecondSegment and (toTheRight or higherOnSweepLine):
+                        intEvent = MySweepEvent(newInt.meetPt[0], newInt.meetPt[1], {predSeg, succSeg}, EventType.INTERSECTION, eventCount-1)
+                        # print("\tintEvent:", intEvent)
+                        heapq.heappush(q, intEvent)
+                # for sThing in t.valueList():
+                #     if not t.isMatchingNodeInTree(sThing.node):
+                #         print("Problem for", sThing, "node!!!")
+            
+            else: # It's an intersection
+                newElem = np.array((p.x, p.y))
+                intersections.append(newElem)
+                intSegments = deque(sorted(p.segments))
+                
+                # These segments will "become" min and max after the swaps.
+                maxSeg = intSegments[0]
+                minSeg = intSegments[-1]
+    
+    
+                extendBeforeInt = []
+                extendAfterInt = []
+    
+                for intSeg in intSegments:
+                    x0Diff = p.x - intSeg.p0[0]
+                    y0Diff = p.y - intSeg.p0[1]
+                    x1Diff = intSeg.p1[0] - p.x
+                    y1Diff = intSeg.p1[1] - p.y
+                    x0Before = x0Diff > EQUAL_THRESHOLD
+                    x0Equal = abs(x0Diff) < EQUAL_THRESHOLD
+                    y0Before = y0Diff > EQUAL_THRESHOLD
+    
+                    x1After = x1Diff > EQUAL_THRESHOLD
+                    x1Equal = abs(x1Diff) < EQUAL_THRESHOLD
+                    y1After = y1Diff > EQUAL_THRESHOLD
+                    
+                    # Note: Before and After not mutually exclusive here.
+                    before = x0Before or (x0Equal and y0Before)
+                    after = x1After or (x1Equal and y1After)
+    
+                    if before and intSeg.forwardHalfEdge:
+                        extendBeforeInt.append(intSeg)
+                    if after:
+                        extendAfterInt.insert(0, intSeg)  
+                
+                newVertex = Vertex((p.x, p.y), None)
+                segIndex = 0
+                while newVertex.vertexID < 0 and segIndex < len(extendBeforeInt):
+                    vertSeg = extendBeforeInt[segIndex]
+                    if vertSeg.p1Index >= 0 and abs(vertSeg.p1[0] - p.x) < EQUAL_THRESHOLD and abs(vertSeg.p1[1] - p.y) < EQUAL_THRESHOLD:
+                        newVertex.vertexID = vertSeg.p1Index
+                    segIndex += 1
+                segIndex = 0
+                while newVertex.vertexID < 0 and segIndex < len(extendAfterInt):
+                    vertSeg = extendAfterInt[segIndex]
+                    if vertSeg.p0Index >= 0 and abs(vertSeg.p0[0] - p.x) < EQUAL_THRESHOLD and abs(vertSeg.p0[1] - p.y) < EQUAL_THRESHOLD:
+                        newVertex.vertexID = vertSeg.p0Index
+                    segIndex += 1
+                partitionMesh.verts.append(newVertex)
+                if partitionMesh.vertexOnShape is None and newVertex.vertexID >= 0:
+                    partitionMesh.vertexOnShape = newVertex
+    
+                print("Before Segs:")
+                for bs in extendBeforeInt:
+                    print("\t", bs)
+                print("After Segs:")
+                for ps in extendAfterInt:
+                    print("\t", ps)
+    
+                # Swap order in tree
+                while len(intSegments) >= 2:
+                    s0 = intSegments.popleft()
+                    s1 = intSegments.pop()
+                    tempNode = s0.node
+                    s0.node = s1.node
+                    s1.node = tempNode
+                    s0.node.subscribers.remove(s1)
+                    s0.node.subscribers.add(s0)
+                    s1.node.subscribers.remove(s0)
+                    s1.node.subscribers.add(s1)
+                    s0.node.value = s0
+                    s1.node.value = s1
+                    
+                    s0.lastIntersectionY = p.y
+                    s1.lastIntersectionY = p.y
+                
+                # print("maxSeg:", maxSeg)
+                # print("minSeg:", minSeg)
+                
+                pred = t.predecessor(minSeg.node)
+                succ = t.successor(maxSeg.node)
+    
+    
+                for i in range(len(extendBeforeInt)):
+                    preSeg = extendBeforeInt[i]
+                    preSeg.forwardHalfEdge.headVertex = newVertex
+                    if i < len(extendBeforeInt) - 1:
+                        nextHalfEdge = extendBeforeInt[i+1].forwardHalfEdge.pair
+                        preSeg.forwardHalfEdge.next = nextHalfEdge
+                        nextHalfEdge.prev = preSeg.forwardHalfEdge
+    
+                newForwardHalfEdges = []
+                for i in range(len(extendAfterInt)):
+                    newForwardHalfEdges.append(partitionMesh.createNewPairOfHalfEdges(newVertex, not extendAfterInt[i].increasesToTheRight))
+    
+                # First two cases are where we're at a "corner" on the edge the set of regions.
+                # Third case is when there are lines both before and after the intersection.
+                if len(extendAfterInt) == 0:
+                    maxPreHalfEdge = extendBeforeInt[-1].forwardHalfEdge
+                    maxPreHalfEdge.next = extendBeforeInt[0].forwardHalfEdge.pair
+                    extendBeforeInt[0].forwardHalfEdge.pair.pev = maxPreHalfEdge
+                    newVertex.outgoingHalfEdge = extendBeforeInt[0].forwardHalfEdge.pair
+                elif len(extendBeforeInt) == 0:
+                    newForwardHalfEdges[0].pair.next = newForwardHalfEdges[-1]
+                    newForwardHalfEdges[-1].prev = newForwardHalfEdges[0].pair
+                    halfEdgePred = pred
+                    halfEdgeSucc = succ
+                    isOutsideFaceFound = False
+                    while halfEdgePred is not None and not isOutsideFaceFound:
+                        if halfEdgePred.value.forwardHalfEdge is not None:
+                            sharedFace = halfEdgePred.value.forwardHalfEdge.leftFace
+                            newForwardHalfEdges[-1].leftFace = sharedFace
+                            newForwardHalfEdges[0].pair.leftFace = sharedFace
+                            isOutsideFaceFound = True
+                        else:
+                            halfEdgePred = t.predecessor(halfEdgePred)
+                    while halfEdgeSucc is not None and not isOutsideFaceFound:
+                        if halfEdgeSucc.value.forwardHalfEdge is not None:
+                            sharedFace = halfEdgeSucc.value.forwardHalfEdge.leftFace
+                            newForwardHalfEdges[-1].leftFace = sharedFace
+                            newForwardHalfEdges[0].pair.leftFace = sharedFace
+                            isOutsideFaceFound = True
+                        else:
+                            halfEdgeSucc = t.predecessor(halfEdgeSucc)
+                            
+                    else:
+                        partitionMesh.assignExteriorFace(newForwardHalfEdges[-1])
+                        partitionMesh.assignExteriorFace(newForwardHalfEdges[0].pair)
+                    
+                    newVertex.outgoingHalfEdge = newForwardHalfEdges[0]
+                else:
+                    newVertex.outgoingHalfEdge = extendBeforeInt[0].forwardHalfEdge.pair
+    
+                    extendBeforeInt[-1].forwardHalfEdge.next = newForwardHalfEdges[-1]
+                    newForwardHalfEdges[-1].prev = extendBeforeInt[-1].forwardHalfEdge
+    
+                    newForwardHalfEdges[0].pair.next = extendBeforeInt[0].forwardHalfEdge.pair
+                    extendBeforeInt[0].forwardHalfEdge.pair.prev = newForwardHalfEdges[0].pair
+    
+                    newForwardHalfEdges[-1].leftFace = newForwardHalfEdges[-1].prev.leftFace
+                    newForwardHalfEdges[0].pair.leftFace = newForwardHalfEdges[0].pair.next.leftFace
+    
+                for i in range(len(extendAfterInt) - 1):
+                    newForwardHalfEdges[i+1].pair.next = newForwardHalfEdges[i]
+                    newForwardHalfEdges[i].prev = newForwardHalfEdges[i+1].pair 
+    
+                    newFace = partitionMesh.createNewFace(newForwardHalfEdges[i])
+    
+                    newForwardHalfEdges[i].leftFace = newFace
+                    newForwardHalfEdges[i].prev.leftFace = newFace
+                    
+                for i in range(len(extendAfterInt)):
+                    extendAfterInt[i].forwardHalfEdge = newForwardHalfEdges[i]
+                
+                
+                if pred:
+                    predSeg = pred.value
+                    # print("predSeg:", predSeg)
+                    predInt = minSeg.intersection(predSeg)
+                    onFirstSegment = predInt.meetS > -EQUAL_THRESHOLD and predInt.meetS < minSeg.length + EQUAL_THRESHOLD
+                    onSecondSegment = predInt.meetT > -EQUAL_THRESHOLD and predInt.meetT < predSeg.length + EQUAL_THRESHOLD
+                    toTheRight = predInt.meetPt[0] > sweepLine.x + EQUAL_THRESHOLD
+                    onSweepLine = (abs(predInt.meetPt[0] - sweepLine.x) < EQUAL_THRESHOLD)
+                    higherOnSweepLine = onSweepLine and (predInt.meetPt[1] > sweepLine.y + EQUAL_THRESHOLD)
+                    if predInt.doMeet and onFirstSegment and onSecondSegment and (toTheRight or higherOnSweepLine):
+                        intEvent = MySweepEvent(predInt.meetPt[0], predInt.meetPt[1], {minSeg, predSeg}, EventType.INTERSECTION, eventCount-1)
+                        if intEvent != p and (intEvent.x - sweepLine.x) > -EQUAL_THRESHOLD:
+                            # print("\tintEvent:", intEvent)
+                            heapq.heappush(q, intEvent)
+                if succ:
+                    succSeg = succ.value
+                    # print("succSeg:", succSeg)
+                    succInt = maxSeg.intersection(succSeg)
+                    onFirstSegment = succInt.meetS > -EQUAL_THRESHOLD and succInt.meetS < maxSeg.length + EQUAL_THRESHOLD
+                    onSecondSegment = succInt.meetT > -EQUAL_THRESHOLD and succInt.meetT < succSeg.length + EQUAL_THRESHOLD
+                    toTheRight = succInt.meetPt[0] > sweepLine.x + EQUAL_THRESHOLD
+                    onSweepLine = (abs(succInt.meetPt[0] - sweepLine.x) < EQUAL_THRESHOLD)
+                    higherOnSweepLine = onSweepLine and (succInt.meetPt[1] > sweepLine.y + EQUAL_THRESHOLD)
+                    if succInt.doMeet and onFirstSegment and onSecondSegment and (toTheRight or higherOnSweepLine):
+                        intEvent = MySweepEvent(succInt.meetPt[0], succInt.meetPt[1], {maxSeg, succSeg}, EventType.INTERSECTION, eventCount-1)
+                        if intEvent != p and (intEvent.x - sweepLine.x) > -EQUAL_THRESHOLD:
+                            # print("\tintEvent:", intEvent)
+                            heapq.heappush(q, intEvent)
+            # t.printTree()
+            # print("---")
+            # print(t.valueList())
+            
+            # for sThing in t.valueList():
+            #     if not t.isMatchingNodeInTree(sThing.node):
+            #         print("Problem for", sThing, "node!!!")
+        print("DEBUG LIST:")
+        for s in debugList:
+            print("\t", s)
+        return partitionMesh
+
+    
