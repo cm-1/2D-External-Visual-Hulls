@@ -63,35 +63,35 @@ def findIntersections(segments):
     
         
     while len(q) > 0:
-        if eventCount == 31:
-            print("here!")
-        print("\nEvents:", eventCount)
+        # if eventCount == 31:
+        #     print("here!")
+        # print("\nEvents:", eventCount)
         eventCount += 1
 
         p = heapq.heappop(q)
-        print("Event: ", p)
+        # print("Event: ", p)
         
         
 
         
-        print("Intersections({0}):".format(len(intersections)))
-        for isec in intersections:
-            print(isec, end=", ")
-        print()
+        # print("Intersections({0}):".format(len(intersections)))
+        # for isec in intersections:
+        #     print(isec, end=", ")
+        # print()
         
         if p.eventType == EventType.INTERSECTION:
             while q[0] == p:
-                print("merging:", [s.index for s in p.segments], ",", [s.index for s in q[0].segments])
+                # print("merging:", [s.index for s in p.segments], ",", [s.index for s in q[0].segments])
                 pToMerge = heapq.heappop(q)
                 p.merge(pToMerge)
-                print("merged segSet:", [s.index for s in p.segments])
+                # print("merged segSet:", [s.index for s in p.segments])
         sweepLine.x = p.x
         sweepLine.y = p.y
         sweepLine.eventType = p.eventType
         
-        for sThing in t.valueList():
-            if not t.isMatchingNodeInTree(sThing.node):
-                print("Problem for", sThing, "node!!!")
+        # for sThing in t.valueList():
+        #     if not t.isMatchingNodeInTree(sThing.node):
+        #         print("Problem for", sThing, "node!!!")
                 
         if p.eventType == EventType.LEFT:
             s = next(iter(p.segments))
@@ -104,26 +104,26 @@ def findIntersections(segments):
             pred = t.predecessor(sNode) # RBTODO
             if succ:
                 succSeg = succ.value # RBTODO
-                print("succSeg:", succSeg)
+                # print("succSeg:", succSeg)
                 succInt = s.intersection(succSeg);
                 onFirstSegment = succInt.meetS > -EQUAL_THRESHOLD and succInt.meetS < s.length + EQUAL_THRESHOLD
                 onSecondSegment = succInt.meetT > -EQUAL_THRESHOLD and succInt.meetT < succSeg.length + EQUAL_THRESHOLD
                 
                 if succInt.doMeet and onFirstSegment and onSecondSegment:
                     intEvent = MySweepEvent(succInt.meetPt[0], succInt.meetPt[1], {s, succSeg}, EventType.INTERSECTION, eventCount-1)
-                    print("\tintEvent:", intEvent)
+                    # print("\tintEvent:", intEvent)
                     heapq.heappush(q, intEvent) # RBTODO
 
             if pred:
                 predSeg = pred.value
-                print("predSeg:", predSeg)
+                # print("predSeg:", predSeg)
                 predInt = s.intersection(predSeg);
                 onFirstSegment = predInt.meetS > -EQUAL_THRESHOLD and predInt.meetS < s.length + EQUAL_THRESHOLD
                 onSecondSegment = predInt.meetT > -EQUAL_THRESHOLD and predInt.meetT < predSeg.length + EQUAL_THRESHOLD
                 
                 if predInt.doMeet and onFirstSegment and onSecondSegment:
                     intEvent = MySweepEvent(predInt.meetPt[0], predInt.meetPt[1], {s, predSeg}, EventType.INTERSECTION, eventCount-1)
-                    print("\tintEvent:", intEvent)
+                    # print("\tintEvent:", intEvent)
                     heapq.heappush(q, intEvent) # RBTODO
                     
         elif p.eventType == EventType.RIGHT:
@@ -131,28 +131,28 @@ def findIntersections(segments):
             
             sNode = s.node
             
-            for sThing in t.valueList():
-                if not t.isMatchingNodeInTree(sThing.node):
-                    print("Problem for", sThing, "node!!!")
+            # for sThing in t.valueList():
+            #     if not t.isMatchingNodeInTree(sThing.node):
+            #         print("Problem for", sThing, "node!!!")
             
             pred = t.predecessor(sNode) # RBTODO
             succ = t.successor(sNode) # RBTODO
             
-            for sThing in t.valueList():
-                if not t.isMatchingNodeInTree(sThing.node):
-                    print("Problem for", sThing, "node!!!")
+            # for sThing in t.valueList():
+            #     if not t.isMatchingNodeInTree(sThing.node):
+            #         print("Problem for", sThing, "node!!!")
             
             t.removeGivenNode(sNode) # RBTODO
             
-            for sThing in t.valueList():
-                if not t.isMatchingNodeInTree(sThing.node):
-                    print("Problem for", sThing, "node!!!")
+            # for sThing in t.valueList():
+            #     if not t.isMatchingNodeInTree(sThing.node):
+            #         print("Problem for", sThing, "node!!!")
             
             if pred and succ:
                 predSeg = pred.value
                 succSeg = succ.value
-                print("predSeg:", predSeg)
-                print("succSeg:", succSeg)
+                # print("predSeg:", predSeg)
+                # print("succSeg:", succSeg)
                 newInt = predSeg.intersection(succSeg);
                 onFirstSegment = newInt.meetS > -EQUAL_THRESHOLD and newInt.meetS < predSeg.length + EQUAL_THRESHOLD
                 onSecondSegment = newInt.meetT > -EQUAL_THRESHOLD and newInt.meetT < succSeg.length + EQUAL_THRESHOLD
@@ -161,11 +161,11 @@ def findIntersections(segments):
                 higherOnSweepLine = onSweepLine and (newInt.meetPt[1] > sweepLine.y + EQUAL_THRESHOLD)
                 if newInt.doMeet and onFirstSegment and onSecondSegment and (toTheRight or higherOnSweepLine):
                     intEvent = MySweepEvent(newInt.meetPt[0], newInt.meetPt[1], {predSeg, succSeg}, EventType.INTERSECTION, eventCount-1)
-                    print("\tintEvent:", intEvent)
+                    # print("\tintEvent:", intEvent)
                     heapq.heappush(q, intEvent) # RBTODO
-            for sThing in t.valueList():
-                if not t.isMatchingNodeInTree(sThing.node):
-                    print("Problem for", sThing, "node!!!")
+            # for sThing in t.valueList():
+            #     if not t.isMatchingNodeInTree(sThing.node):
+            #         print("Problem for", sThing, "node!!!")
         
         else: # It's an intersection
             newElem = np.array((p.x, p.y))
@@ -193,15 +193,15 @@ def findIntersections(segments):
                 s0.lastIntersectionY = p.y
                 s1.lastIntersectionY = p.y
                 
-            print("maxSeg:", maxSeg)
-            print("minSeg:", minSeg)
+            # print("maxSeg:", maxSeg)
+            # print("minSeg:", minSeg)
             
             pred = t.predecessor(minSeg.node)
             succ = t.successor(maxSeg.node)
             
             if pred:
                 predSeg = pred.value
-                print("predSeg:", predSeg)
+                # print("predSeg:", predSeg)
                 predInt = minSeg.intersection(predSeg);
                 onFirstSegment = predInt.meetS > -EQUAL_THRESHOLD and predInt.meetS < minSeg.length + EQUAL_THRESHOLD
                 onSecondSegment = predInt.meetT > -EQUAL_THRESHOLD and predInt.meetT < predSeg.length + EQUAL_THRESHOLD
@@ -211,11 +211,11 @@ def findIntersections(segments):
                 if predInt.doMeet and onFirstSegment and onSecondSegment and (toTheRight or higherOnSweepLine):
                     intEvent = MySweepEvent(predInt.meetPt[0], predInt.meetPt[1], {minSeg, predSeg}, EventType.INTERSECTION, eventCount-1)
                     if intEvent != p and (intEvent.x - sweepLine.x) > -EQUAL_THRESHOLD:
-                        print("\tintEvent:", intEvent)
+                        # print("\tintEvent:", intEvent)
                         heapq.heappush(q, intEvent) # RBTODO
             if succ:
                 succSeg = succ.value # RBTODO
-                print("succSeg:", succSeg)
+                # print("succSeg:", succSeg)
                 succInt = maxSeg.intersection(succSeg);
                 onFirstSegment = succInt.meetS > -EQUAL_THRESHOLD and succInt.meetS < maxSeg.length + EQUAL_THRESHOLD
                 onSecondSegment = succInt.meetT > -EQUAL_THRESHOLD and succInt.meetT < succSeg.length + EQUAL_THRESHOLD
@@ -225,15 +225,15 @@ def findIntersections(segments):
                 if succInt.doMeet and onFirstSegment and onSecondSegment and (toTheRight or higherOnSweepLine):
                     intEvent = MySweepEvent(succInt.meetPt[0], succInt.meetPt[1], {maxSeg, succSeg}, EventType.INTERSECTION, eventCount-1)
                     if intEvent != p and (intEvent.x - sweepLine.x) > -EQUAL_THRESHOLD:
-                        print("\tintEvent:", intEvent)
+                        # print("\tintEvent:", intEvent)
                         heapq.heappush(q, intEvent) # RBTODO
-        t.printTree()
-        print("---")
-        print(t.valueList())
+        # t.printTree()
+        # print("---")
+        # print(t.valueList())
         
-        for sThing in t.valueList():
-            if not t.isMatchingNodeInTree(sThing.node):
-                print("Problem for", sThing, "node!!!")
+        # for sThing in t.valueList():
+        #     if not t.isMatchingNodeInTree(sThing.node):
+        #         print("Problem for", sThing, "node!!!")
     return intersections
         
 class MySweepEvent:
