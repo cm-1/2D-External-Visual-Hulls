@@ -1,0 +1,5 @@
+__pycache__/
+.vscode/
+
+# rbt.py ignored until I replace it with something that doesn't have licensing ambiguity.
+rbt.py
