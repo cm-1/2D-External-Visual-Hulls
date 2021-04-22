@@ -1128,6 +1128,23 @@ class Scene:
                     # that, so they'll currently be two separate ones.
                     # Thus, this must be reconciled. We'll keep one and
                     # replace the other with it.
+                    faceSetToRemove = set()
+                    if not partitionMesh.isExteriorFace(topForwardHalfEdge.leftFace):
+                        halfEdgeToReplaceFaceOn = topForwardHalfEdge
+                        while halfEdgeToReplaceFaceOn is not None and halfEdgeToReplaceFaceOn.leftFace != bottomBackwardHalfEdge.leftFace:
+                            faceSetToRemove.add(halfEdgeToReplaceFaceOn.leftFace)
+                            halfEdgeToReplaceFaceOn.leftFace = bottomBackwardHalfEdge.leftFace
+                            halfEdgeToReplaceFaceOn = halfEdgeToReplaceFaceOn.prev
+                    else:
+                        halfEdgeToReplaceFaceOn = bottomBackwardHalfEdge
+                        while halfEdgeToReplaceFaceOn is not None and halfEdgeToReplaceFaceOn.leftFace != topForwardHalfEdge.leftFace:
+                            faceSetToRemove.add(halfEdgeToReplaceFaceOn.leftFace)
+                            halfEdgeToReplaceFaceOn.leftFace = topForwardHalfEdge.leftFace
+                            halfEdgeToReplaceFaceOn = halfEdgeToReplaceFaceOn.next
+                    for faceToRemove in faceSetToRemove:
+                        partitionMesh.removeFace(faceToRemove)
+
+                    
                     
                 elif len(extendBeforeInt) == 0:
                     newForwardHalfEdges[0].pair.next = newForwardHalfEdges[-1]
