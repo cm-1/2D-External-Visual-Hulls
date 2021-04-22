@@ -146,14 +146,13 @@ for w in worlds:
 
 #%%
 reminders = [
-     "Is there a better way (cos()) to handle parallelism in isLineInsideEdgeAngle()?",
+     "Is there a better way, using cos(), to handle parallelism in isLineInsideEdgeAngle()?",
      "Pruning of lines that intersect obj at CONTACT verts. (I forget what EXACTLY this meant)",
      "Pruning of segments outside convex hull.",
      "Replace RB Tree with my own, or one with better licensing!"
      "Right now, swapDir() side effect in findIntersections(). Should this be changed?",
-     "All of this 'is (not) None' checking for the half-edge structure should be fixed!",
-     "Separate matplotlib part from the rest!"
-     ]
+     "All of this 'is (not) None' checking for the half-edge structure should be fixed!"
+]
 
 for reminder in reminders:
     sep = "==========="
