@@ -104,7 +104,10 @@ world2.addPolygon(polygon2)
 
 polygon1 = [(0, 2), (1,1), (2,2), (1,0)]
 polygon2 = [(3,3), (4,2), (5,3)]
-#polygon2 = [(p[0] - 3, p[1]) for p in polygon2]
+# polygon2 = [(p[0] - 3, p[1]) for p in polygon2]
+# Horizontal flip for testing purposes.
+polygon1 = [(-p[0], p[1]) for p in polygon1]
+polygon2 = [(-p[0], p[1]) for p in polygon2]
 world3.addPolygon(polygon1)
 world3.addPolygon(polygon2)
 
@@ -138,9 +141,27 @@ world6.addPolygon(polygon3)
 
 worlds = [world0, world1, world2, world3, world4, world5, world6]
 
+worldIndex = 0
 for w in worlds:
+    print("\nWorld:", worldIndex)
+    worldIndex += 1
     w.calcFreeLines()
     drawScene(w)
+    
+    faceList = w.drawableFaces
+    for f in faceList:
+        doubleFace = False
+        origHE = f.halfEdge
+        he = f.halfEdge.next
+        while he != origHE:
+            if f.index != he.leftFace.index:
+                doubleFace = True
+                break
+            he = he.next
+        if doubleFace:
+            print("Double face:")
+            print(f.getCoords())
+            print("-----")
 
 
 

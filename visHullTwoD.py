@@ -847,10 +847,7 @@ class Scene:
             
             vertHalfEdge = vertHalfEdge.pair.next
             
-        print("Starting face:")
-        sfCoords = startingFace.getCoords()
-        for sfCoord in sfCoords:
-            print(" -", sfCoord)
+
         # Now, DFS to assign visual numbers to all faces.
         stack = [{"face": startingFace, "visualNumber": 0}]
         while len(stack) > 0:
@@ -1214,6 +1211,7 @@ class Scene:
 def getCoordsUnsafe(face):
     v = face.halfEdge.headVertex.position
     print("-----\nPosition:", v)
+    print("F Index:", face.index)
     vertices = [v]
     origHE = face.halfEdge
     he = face.halfEdge.next
@@ -1222,6 +1220,7 @@ def getCoordsUnsafe(face):
         #    break
         v = he.headVertex.position
         print("Position:", v)
+        print("F Index:", he.leftFace.index)
         vertices.append(v)
         he = he.next
     return np.array(vertices)
