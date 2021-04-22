@@ -983,6 +983,7 @@ class Scene:
                     halfEdge = s.forwardHalfEdge    
                     halfEdge.prev.next = halfEdge.pair.next
                     halfEdge.pair.next.prev = halfEdge.prev
+                    
     
                     # The only thing on the side of an edge terminating outside of the convex hull
                     # Is an exterior face, not an interior one. So, we delete any non-exterior
@@ -991,6 +992,10 @@ class Scene:
                         partitionMesh.removeFace(halfEdge.leftFace)
                     if not partitionMesh.isExteriorFace(halfEdge.pair.leftFace):
                         partitionMesh.removeFace(halfEdge.pair.leftFace)
+                        
+                    partitionMesh.assignExteriorFace(halfEdge.prev)
+                    partitionMesh.assignExteriorFace(halfEdge.pair.next)
+                    
                     
                     partitionMesh.removeHalfEdgePair(halfEdge)
 
@@ -1206,21 +1211,3 @@ class Scene:
             #         print("Problem for", sThing, "node!!!")
         return partitionMesh
 
-    
-#%%
-def getCoordsUnsafe(face):
-    v = face.halfEdge.headVertex.position
-    print("-----\nPosition:", v)
-    print("F Index:", face.index)
-    vertices = [v]
-    origHE = face.halfEdge
-    he = face.halfEdge.next
-    while he != origHE:
-        #if he.headVertex is None:
-        #    break
-        v = he.headVertex.position
-        print("Position:", v)
-        print("F Index:", he.leftFace.index)
-        vertices.append(v)
-        he = he.next
-    return np.array(vertices)

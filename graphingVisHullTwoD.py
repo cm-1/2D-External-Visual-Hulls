@@ -2,6 +2,33 @@ import matplotlib.pyplot as plt
 import numpy as np
 from visHullTwoD import Scene, SegmentType
 
+#%%
+
+def doubleFaceTest(f):
+    doubleFace = False
+    origHE = f.halfEdge
+    he = f.halfEdge.next
+    while he != origHE:
+        if f.index != he.leftFace.index:
+            doubleFace = True
+            break
+        he = he.next
+    if doubleFace:
+        print("Double face ({0}):".format(f.index))
+        origHE = f.halfEdge
+        he = f.halfEdge.next
+        while he != origHE:
+            fIndex = he.leftFace.index
+            v0 = he.prev.headVertex.position
+            v1 = he.headVertex.position
+            print(" - F{0}, {1}->{2}".format(fIndex, v0, v1))
+            he = he.next
+        v0 = he.prev.headVertex.position
+        v1 = he.headVertex.position
+        print(" - F{0}, {1}->{2}".format(fIndex, v0, v1))
+        print("-----")
+#%%
+
 def drawScene(scene):
     print("cwList:", scene.cwList)
     # Plot all polygons.
@@ -148,20 +175,9 @@ for w in worlds:
     w.calcFreeLines()
     drawScene(w)
     
-    faceList = w.drawableFaces
-    for f in faceList:
-        doubleFace = False
-        origHE = f.halfEdge
-        he = f.halfEdge.next
-        while he != origHE:
-            if f.index != he.leftFace.index:
-                doubleFace = True
-                break
-            he = he.next
-        if doubleFace:
-            print("Double face:")
-            print(f.getCoords())
-            print("-----")
+    faceList = w.partitionMesh.faces
+    for k in faceList:
+        doubleFaceTest(faceList[k])
 
 
 
