@@ -1117,10 +1117,18 @@ class Scene:
                 # First two cases are where we're at a "corner" on the edge the set of regions.
                 # Third case is when there are lines both before and after the intersection.
                 if len(extendAfterInt) == 0:
-                    maxPreHalfEdge = extendBeforeInt[-1].forwardHalfEdge
-                    maxPreHalfEdge.next = extendBeforeInt[0].forwardHalfEdge.pair
-                    extendBeforeInt[0].forwardHalfEdge.pair.prev = maxPreHalfEdge
+                    topForwardHalfEdge = extendBeforeInt[-1].forwardHalfEdge
+                    bottomBackwardHalfEdge = extendBeforeInt[0].forwardHalfEdge.pair
+                    topForwardHalfEdge.next = bottomBackwardHalfEdge
+                    bottomBackwardHalfEdge.prev = topForwardHalfEdge
                     newVertex.outgoingHalfEdge = extendBeforeInt[0].forwardHalfEdge.pair
+                    # If this "corner" forms a concave "dent" in a region, then
+                    # the two faces on either side of the corner are actually
+                    # the same, but will have been created without "knowing"
+                    # that, so they'll currently be two separate ones.
+                    # Thus, this must be reconciled. We'll keep one and
+                    # replace the other with it.
+                    
                 elif len(extendBeforeInt) == 0:
                     newForwardHalfEdges[0].pair.next = newForwardHalfEdges[-1]
                     newForwardHalfEdges[-1].prev = newForwardHalfEdges[0].pair
