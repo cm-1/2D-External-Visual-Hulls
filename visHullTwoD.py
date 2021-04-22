@@ -42,8 +42,8 @@ class Face:
         origHE = self.halfEdge
         he = self.halfEdge.next
         while he != origHE:
-            if he.headVertex is None:
-                break
+            #if he.headVertex is None:
+            #    break
             v = he.headVertex.position
             vertices.append(v)
             he = he.next
@@ -75,13 +75,11 @@ class HalfEdgeStructure:
 
     def assignExteriorFace(self, halfEdge):
         if self._exteriorFaceIndex < 0:
-            self.faces[self.faceIndexCounter] = self.createNewFace(halfEdge)
             self._exteriorFaceIndex = self.faceIndexCounter
-            self.faceIndexCounter += 1
+            self.createNewFace(halfEdge)
         halfEdge.leftFace = self.faces[self._exteriorFaceIndex]
         
     def removeFace(self, face):
-        print("Deleting face", face.index, "from set of keys", self.faces.keys())
         if face.index in self.faces:
             del self.faces[face.index]
 
@@ -780,25 +778,25 @@ class Scene:
     def calculateVisualHull(self):      
         self.partitionMesh = self.findIntersections()
     
-        correctedFaces = set()
         self.drawableFaces = []
         for f in self.partitionMesh.faces.values():
             if self.partitionMesh.isExteriorFace(f):
                 continue
-            he = f.halfEdge
-            if he.headVertex is None:
-                continue
-            correctedFaces.add(f)
-            v = he.headVertex.position
+            #he = f.halfEdge
+            #if he.headVertex is None:
+            #    continue
+            '''v = he.headVertex.position
             origHE = he
             he = he.next
             while he != origHE:
-                if he.headVertex is None:
-                    break
+                #if he.headVertex is None:
+                #    break
                 v = he.headVertex.position
-                he = he.next
+                he = he.next'''
             self.drawableFaces.append(f)
         
+        print("Num of drawable faces:", len(self.drawableFaces))
+
         # We know that the below vertex is on the shape.
         # Now we need to find out which of its faces has visual number 0.
         # First, we can assume the vertex is convex, else it wouldn't
@@ -849,11 +847,12 @@ class Scene:
             
             vertHalfEdge = vertHalfEdge.pair.next
             
-        
+        print("Starting face:")
+        sfCoords = startingFace.getCoords()
+        for sfCoord in sfCoords:
+            print(" -", sfCoord)
         # Now, DFS to assign visual numbers to all faces.
         stack = [{"face": startingFace, "visualNumber": 0}]
-        if not (startingFace in correctedFaces):
-            print("TROUBLE!")
         while len(stack) > 0:
             currFace = stack.pop()
             if currFace["face"].visualNumber < 0:
@@ -861,17 +860,17 @@ class Scene:
                 currFace["face"].visualNumber = vn
                 halfEdge = currFace["face"].halfEdge
                 adjFace = halfEdge.pair.leftFace
-                if (not self.partitionMesh.isExteriorFace(adjFace)) and (adjFace in correctedFaces):
+                if (not self.partitionMesh.isExteriorFace(adjFace)) and (adjFace in self.drawableFaces):
                     vnChange = -1 if halfEdge.increasesLeft else 1
                     stack.append({"face": adjFace, "visualNumber": vn+vnChange})
                     
                 origHalfEdge = halfEdge
                 halfEdge = halfEdge.next
                 while halfEdge != origHalfEdge:
-                    if halfEdge is None:
-                        break
+                    #if halfEdge is None:
+                    #    break
                     adjFace = halfEdge.pair.leftFace
-                    if (not self.partitionMesh.isExteriorFace(adjFace)) and (adjFace in correctedFaces):
+                    if (not self.partitionMesh.isExteriorFace(adjFace)) and (adjFace in self.drawableFaces):
                         vnChange = -1 if halfEdge.increasesLeft else 1
                         stack.append({"face": adjFace, "visualNumber": vn+vnChange})
                     halfEdge = halfEdge.next    
@@ -984,12 +983,10 @@ class Scene:
                 t.removeGivenNode(sNode)
                 
                 if (s.forwardHalfEdge is not None) and (s.forwardHalfEdge.headVertex is None): #possibly need to check x coords of pair.headVertex against current x coords?
-                    print("Perfect case:", s)    
-                    '''halfEdge = s.forwardHalfEdge    
+                    halfEdge = s.forwardHalfEdge    
                     halfEdge.prev.next = halfEdge.pair.next
                     halfEdge.pair.next.prev = halfEdge.prev
     
-                    keptFace = halfEdge.leftFace
                     # The only thing on the side of an edge terminating outside of the convex hull
                     # Is an exterior face, not an interior one. So, we delete any non-exterior
                     # faces on both sides of this half-edge.
@@ -998,7 +995,7 @@ class Scene:
                     if not partitionMesh.isExteriorFace(halfEdge.pair.leftFace):
                         partitionMesh.removeFace(halfEdge.pair.leftFace)
                     
-                    partitionMesh.removeHalfEdgePair(halfEdge)'''
+                    partitionMesh.removeHalfEdgePair(halfEdge)
 
                 
                 if pred and succ:
@@ -1120,7 +1117,7 @@ class Scene:
                 if len(extendAfterInt) == 0:
                     maxPreHalfEdge = extendBeforeInt[-1].forwardHalfEdge
                     maxPreHalfEdge.next = extendBeforeInt[0].forwardHalfEdge.pair
-                    extendBeforeInt[0].forwardHalfEdge.pair.pev = maxPreHalfEdge
+                    extendBeforeInt[0].forwardHalfEdge.pair.prev = maxPreHalfEdge
                     newVertex.outgoingHalfEdge = extendBeforeInt[0].forwardHalfEdge.pair
                 elif len(extendBeforeInt) == 0:
                     newForwardHalfEdges[0].pair.next = newForwardHalfEdges[-1]
