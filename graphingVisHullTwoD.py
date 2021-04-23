@@ -133,8 +133,8 @@ polygon1 = [(0, 2), (1,1), (2,2), (1,0)]
 polygon2 = [(3,3), (4,2), (5,3)]
 # polygon2 = [(p[0] - 3, p[1]) for p in polygon2]
 # Horizontal flip for testing purposes.
-#polygon1 = [(-p[0], p[1]) for p in polygon1]
-#polygon2 = [(-p[0], p[1]) for p in polygon2]
+polygon1 = [(-p[0], p[1]) for p in polygon1]
+polygon2 = [(-p[0], p[1]) for p in polygon2]
 world3.addPolygon(polygon1)
 world3.addPolygon(polygon2)
 
