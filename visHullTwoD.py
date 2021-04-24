@@ -186,7 +186,7 @@ class MyLine:
         self.isSegment = isSegment
         self.length = np.linalg.norm(self.p1 - self.p0)
         
-        self.isVertical = (p0[0] == p1[0])
+        self.isVertical = abs(p0[0] - p1[0]) < EQUAL_THRESHOLD
         self.m = None
         self.b = None
         if not self.isVertical:
@@ -586,15 +586,29 @@ class Scene:
                     newSegments = self.createActiveSegments(i, j)                    
                     
                     for newSeg in newSegments:
+
                         cKey = round(newSeg.p0[0], EQUAL_DECIMAL_PLACES)
                         dictOfInterest = vertLineDict
                         if not newSeg.isVertical:
                             cKey = (round(newSeg.m, EQUAL_DECIMAL_PLACES), round(newSeg.b, EQUAL_DECIMAL_PLACES))
                             dictOfInterest = nonVertLineDict
+
                         if cKey in dictOfInterest:
                             dictOfInterest[cKey].append(newSeg)
                         else:
                             dictOfInterest[cKey] = [newSeg]
+        '''print("\n=====\n NON VERT LINES:")
+        for nvldk in nonVertLineDict:
+            print("Key:", nvldk)
+            for nvl in nonVertLineDict[nvldk]:
+                print(" -", nvl)
+        print("\n=====\n VERT LINES:")
+        for vldk in vertLineDict:
+            print("Key:", vldk)
+            for vl in vertLineDict[vldk]:
+                print(" -", vl)
+        print("\n=====\n")'''
+                
         self.unifySegments(nonVertLineDict, False)
         self.unifySegments(vertLineDict, True)
         self.calculateVisualHull()
@@ -889,10 +903,10 @@ class Scene:
             pL = s.p0
             pR = s.p1
             shouldSwap = False
-            if pR[0] < pL[0]:
+            if pR[0] < pL[0] - EQUAL_THRESHOLD:
                 shouldSwap = True
-            elif pR[0] == pL[0]:
-                if pR[1] < pL[1]:
+            elif abs(pR[0] - pL[0]) < EQUAL_THRESHOLD:
+                if pR[1] < pL[1] - EQUAL_THRESHOLD:
                     shouldSwap = True
             
             if shouldSwap:
@@ -914,12 +928,12 @@ class Scene:
         
             
         while len(q) > 0:
-            # if eventCount == 31:
-            #     print("here!")
-            # print("\nEvents:", eventCount)
+            '''if eventCount == 31:
+                print("here!")
+            print("\nEvents:", eventCount)'''
             eventCount += 1
             p = heapq.heappop(q)
-            # print("Event: ", p)
+            #print("Event: ", p)
             
             # print("Intersections({0}):".format(len(intersections)))
             # for isec in intersections:
