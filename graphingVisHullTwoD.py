@@ -174,8 +174,8 @@ world7.addPolygon(polygon1)
 polygon1 = [(-1, 1), (-2, 1), (-2, -1), (-1, -1)]
 polygon2 = [(-1, -1), (0, 0), (1, -1), (1, 1), (0, 2), (-1, 1)]
 polygon3 = [(1, -1), (2, -1), (2, 1), (1, 1)]
-polygon1 = [(p[0], 0.000001 + p[1]) for p in polygon1]
-polygon3 = [(p[0], 0.000001 + p[1]) for p in polygon3]
+# polygon1 = [(p[0], 0.9*p[1]) for p in polygon1]
+# polygon3 = [(p[0], 0.9*p[1]) for p in polygon3]
 
 world8.addPolygon(polygon1)
 world8.addPolygon(polygon2)
@@ -183,7 +183,7 @@ world8.addPolygon(polygon3)
 
 # 0.9999995231628418
 polygon1 = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
-polygon2 = [(1, 0.9999995231628418), (2, -1), (3, 0), (2, 1)]
+polygon2 = [(1, 1), (2, -1), (3, 0), (2, 1)]
 
 world9.addPolygon(polygon1)
 world9.addPolygon(polygon2)
@@ -191,7 +191,7 @@ world9.addPolygon(polygon2)
 
 #world.addLine((0, 2.5), (3, 2.5))
 
-worlds = [world9, world0, world1, world2, world3, world4, world5, world6, world7, world8]
+worlds = [world0, world1, world2, world3, world4, world5, world6, world7, world8, world9]
 
 worldIndex = 0
 for w in worlds:
