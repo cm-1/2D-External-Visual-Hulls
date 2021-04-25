@@ -352,12 +352,33 @@ class MySortableSegment(MyActiveLine):
 class MyPolygon:
     def __init__(self, pts):
         npts = np.array(pts)
+        
+        # Find out whether the polygon is clockwise or counterclockwise.
+        # Will be using the technique given in StackOverflow user Beta's answer
+        # to user Stécy's question "How to determine if a list of polygon points are in clockwise order?"
+        # asked on 2009-07-22. Link: https://stackoverflow.com/a/1165943/11295586
+        # An explanation is given at: https://web.archive.org/web/20200812125342/https://www.element84.com/blog/determining-the-winding-of-a-polygon-given-as-a-set-of-ordered-points
+        # Basically, sum up (x2 − x1)(y2 + y1) over all edges
+        # Curve is clockwise iff sum is positive.
+        xy0s = npts
+        xy1s = np.roll(xy0s, -1, axis=0) # Shift vertices by 1 index
+        terms = (xy1s[:, 0] - xy0s[:, 0])*(xy1s[:, 1] + xy0s[:, 1])
+        twiceArea = terms.sum() # As described in the links above, the sum is twice the area
+        self._isCW = (twiceArea > 0)
+        
         # "Close" the polygon s.t. the first and last vertex are identical.
         # First, check if the first and last points are already the same.
         if not np.all(npts[0] == npts[-1]):
             # If not, add the first pt to the end.
             npts = np.vstack((npts, npts[0, :]))
         self._coords = npts
+    
+    def changeOrientation(self):
+        self._isCW = not self._isCW
+        self._coords = np.flip(self._coords, axis=0)
+    
+    def isClockwise(self):
+        return self._isCW
     
     def getCoords(self):
         return np.copy(self._coords) # Look into the shallow/deep copy nature of this at some point!
@@ -481,23 +502,13 @@ class Scene:
         
     def addPolygon(self, pts):
         newVertices = np.array(pts, dtype=np.float64)
-        #newVertices[:, 0] = newVertices[:, 0] - 2.33
 
-        self.polygons.append(MyPolygon(pts)) #newVertices.tolist()))
+        newPolygon = MyPolygon(pts)
+
+        self.polygons.append(newPolygon)
         
-        # Find out whether the polygon is clockwise or counterclockwise.
-        # Will be using the technique given in StackOverflow user Beta's answer
-        # to user Stécy's question "How to determine if a list of polygon points are in clockwise order?"
-        # asked on 2009-07-22. Link: https://stackoverflow.com/a/1165943/11295586
-        # An explanation is given at: https://web.archive.org/web/20200812125342/https://www.element84.com/blog/determining-the-winding-of-a-polygon-given-as-a-set-of-ordered-points
-        # Basically, sum up (x2 − x1)(y2 + y1) over all edges
-        # Curve is clockwise iff sum is positive.
         
-        xy1s = newVertices
-        xy2s = np.roll(xy1s, -1, axis=0) # Shift vertices by 1 index
-        terms = (xy2s[:, 0] - xy1s[:, 0])*(xy2s[:, 1] + xy1s[:, 1])
-        twiceArea = terms.sum() # As described in the links above, the sum is twice the area
-        self.cwList.append( (twiceArea > 0) )
+        self.cwList.append(newPolygon.isClockwise())
         
         
         # Separate the x and y values for the new vertices.
