@@ -36,8 +36,8 @@ scaledClip = pyclipper.scale_to_clipper(clipPolygon.getCoords())
 plt.show()
 
 pc = pyclipper.Pyclipper()
-pc.AddPath(scaledClip, pyclipper.PT_CLIP, True)
-pc.AddPaths(scaledSubj, pyclipper.PT_SUBJECT, True)
+pc.AddPath(scaledClip, pyclipper.PT_SUBJECT, True)
+pc.AddPaths(scaledSubj, pyclipper.PT_CLIP, True)
 
 pcModes = [pyclipper.PFT_EVENODD, pyclipper.PFT_NEGATIVE, pyclipper.PFT_NONZERO, pyclipper.PFT_POSITIVE]
 
@@ -46,12 +46,21 @@ pcModeClip = pcModes[0]
 
 # CT_INTERSECTION
 # CT_DIFFERENCE
-solution = pc.Execute(pyclipper.CT_INTERSECTION, pcModeSubj, pcModeClip)
+solution0 = pc.Execute(pyclipper.CT_INTERSECTION, pcModeSubj, pcModeClip)
+solution1 = pc.Execute(pyclipper.CT_DIFFERENCE, pcModeSubj, pcModeClip)
 
-scaledSolution = []
-for soln in solution:
+scaledSolution0 = []
+for soln in solution0:
     scaledSoln = pyclipper.scale_from_clipper(soln)
-    scaledSolution.append(scaledSoln)
+    scaledSolution0.append(scaledSoln)
+    drawPolygon(MyPolygon(scaledSoln), "r", "g")
+
+plt.show()
+
+scaledSolution1 = []
+for soln in solution1:
+    scaledSoln = pyclipper.scale_from_clipper(soln)
+    scaledSolution1.append(scaledSoln)
     drawPolygon(MyPolygon(scaledSoln), "r", "g")
 
 plt.show()
