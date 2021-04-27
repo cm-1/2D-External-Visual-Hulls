@@ -113,6 +113,7 @@ world6 = Scene()
 world7 = Scene()
 world8 = Scene()
 world9 = Scene()
+world10 = Scene()
 
 # These are the tris from Petitjean's diagram
 polygon1 = [(0, 0), (2.25, 0.5), (1.25, 2.3)] # [(0,3),(1,1),(3,0),(4,0),(3,4)]
@@ -188,10 +189,15 @@ polygon2 = [(1, 1), (2, -1), (3, 0), (2, 1)]
 world9.addPolygon(polygon1)
 world9.addPolygon(polygon2)
 
+polygon1 = [(0.734870970249176, 0.26040399074554443), (-0.045375000685453415, 0.8651400208473206), (-0.8234530091285706, 0.4177840054035187), (-0.14182999730110168, 0.21450699865818024)]
+polygon2 = [(-1.0, 1.0108875036239624), (1.0, 1.010890007019043), (1.0, 1.3735400438308716), (-1.0, 1.373543620109558)]
+
+world10.addPolygon(polygon2)
+world10.addPolygon(polygon1)
 
 #world.addLine((0, 2.5), (3, 2.5))
 
-worlds = [world0, world1, world2, world3, world4, world5, world6, world7, world8, world9]
+worlds = [world0, world1, world2, world3, world4, world5, world6, world7, world8, world9, world10]
 
 worldIndex = 0
 for w in worlds:

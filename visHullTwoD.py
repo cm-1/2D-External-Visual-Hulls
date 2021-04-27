@@ -939,6 +939,12 @@ class Scene:
         # Get the line bisecting the vertex's angle
         unnormedBisect = dir0 + dir1
         bisector = unnormedBisect/np.linalg.norm(unnormedBisect)
+        def atanPos(coord):
+            regAtan = math.atan2(coord[1], coord[0])
+            if regAtan < 0:
+                regAtan += (2.0 * math.pi)
+            return regAtan
+        bisectorAngle = atanPos(bisector)
         
         startingFace = None
         vertHalfEdge = vertOnShape.outgoingHalfEdge
@@ -951,15 +957,24 @@ class Scene:
             v2 = v2Edge.headVertex.position
             # v1 is the same as in the bisector calculation.
             
-            v0Angle = math.atan2(v0[1] - v1[1], v0[0] - v1[0]) + math.pi
-            v2Angle = math.atan2(v2[1] - v1[1], v2[0] - v2[0]) + math.pi
-            bisectorAngle = math.atan2(bisector[1], bisector[0]) + math.pi
+            v0Angle = atanPos(v0 - v1)
+            v2Angle = atanPos(v2 - v1)
+            bisectorAngleCopy = bisectorAngle
             # Case where the v0 to v2 range crosses over 0 radians axis.
             if v2Angle < v0Angle:
+                # To fix, "rotate" all angles so that v0 lies on 0 radian axis.
                 v2Angle += (2.0 * math.pi) - v0Angle
-                bisectorAngle += (2.0 * math.pi) - v0Angle 
+                bisectorAngleCopy += (2.0 * math.pi) - v0Angle
+                v0Angle = 0
+                # It is now possible that bisectorAngleCopy > 2pi
+                # Technically, this only happens if it is between v0 and v2,
+                # meaning that we could just set startingFace here.
+                # But it's not a huge gain in performance, so I'm leaving it 
+                # for now.
+                if bisectorAngleCopy > (2.0 * math.pi):
+                    bisectorAngleCopy -= (2.0 * math.pi)
             
-            if bisectorAngle > v0Angle and bisectorAngle < v2Angle:
+            if bisectorAngleCopy > v0Angle and bisectorAngleCopy < v2Angle:
                 startingFace = v0Edge.leftFace
             
             vertHalfEdge = vertHalfEdge.pair.next
