@@ -6,7 +6,7 @@ import heapq
 
 from rbt import RedBlackTree # REALLY NEED TO REWRITE THIS!
 
-EQUAL_THRESHOLD = 0.0001 # Threshold for considering certain fp numbers equal below.
+EQUAL_THRESHOLD = 0.001 # Threshold for considering certain fp numbers equal below.
 EQUAL_DECIMAL_PLACES = -round(math.log(EQUAL_THRESHOLD, 10))
 
 class EventType(Enum):
@@ -133,7 +133,7 @@ class MySweepEvent:
     def __repr__(self):
         retStr = ""
         if self.eventType == EventType.INTERSECTION:
-            retStr = "({0}, {1}), segIDS: {2}, {3}. dbID: {4}".format(self.x, self.y, [s.index for s in self.segments], "INTERSECTION", self.debugID) 
+            retStr = "<{0}, {1}>, segIDS: {2}, {3}. dbID: {4}".format(self.x, self.y, [s.index for s in self.segments], "INTERSECTION", self.debugID) 
         else:
             eventStr = "LEFT" if self.eventType == EventType.LEFT else "RIGHT"
             seg = next(iter(self.segments))
@@ -165,7 +165,39 @@ class MySweepEvent:
         self.segments = self.segments.union(other.segments)
         return self
     
-
+    def debugEq(self, other):
+        ret = {}
+        ret["debugIDsEq"] = (self.debugID == other.debugID)
+        ret["eventsEq"] = (self.eventType == other.eventType)
+        if not ret["eventsEq"]:
+            print("   EventTypeDiff: ", self.eventType, other.eventType)
+        
+        ret["numSegmentsEq"] = (len(self.segments) == len(other.segments))
+        
+        ret["allSegmentsEq"] = True
+        if ret["numSegmentsEq"]:
+            selfSegs = list(self.segments)
+            otherSegs = list(other.segments)
+            selfSegs.sort()
+            otherSegs.sort()
+            
+            for i in range(len(selfSegs)):
+                s = selfSegs[i]
+                o = otherSegs[i]
+                
+                p0IndexEq = (s.p0Index == o.p0Index)
+                p1IndexEq = (s.p1Index == o.p1Index)
+                activeTypeEq = (s.activeType == o.activeType)
+                increaseDirEq = (s.increasesToTheRight == o.increasesToTheRight)
+                indexEq = (s.index == o.index)
+                
+                ret["allSegmentsEq"] = (p0IndexEq and p1IndexEq and activeTypeEq and increaseDirEq and indexEq)
+                if not ret["allSegmentsEq"]:
+                    break
+        else:
+            ret["allSegmentsEq"] = False
+                
+        return ret
             
         
 class SegmentType(Enum):
@@ -206,7 +238,7 @@ class MyLine:
         self.dir = (self.p1 - self.p0)/self.length
         
     def __repr__(self):
-        return "{0}->{1}, isSegment: {2}".format(self.p0, self.p1, self.isSegment)
+        return "({0}->{1}), isSegment: {2}".format(self.p0, self.p1, self.isSegment)
         
     # Math here basically came from setting up an augmented matrix
     # for the 2D case of line intersection and solving it.
@@ -271,7 +303,7 @@ class MyActiveLine(MyLine):
         self.activeType = activeType
         self.increasesToTheRight = increasesToTheRight
     def __repr__(self):
-        return "{0}->{1}, right+ is {2}".format(self.p0, self.p1, self.increasesToTheRight)
+        return "({0}->{1}), right+ is {2}".format(self.p0, self.p1, self.increasesToTheRight)
     def swapDir(self):
         self.p0, self.p1 = self.p1, self.p0
         self.p0Index, self.p1Index = self.p1Index, self.p0Index
@@ -294,7 +326,7 @@ class MySortableSegment(MyActiveLine):
         self.forwardHalfEdge = None
         
     def __repr__(self):
-        return "[ ({0}, {1}) -> ({2}, {3}) ]".format(self.p0[0], self.p0[1], self.p1[0], self.p1[1])
+        return "({0}->{1})".format(self.p0, self.p1)
         
     def currentY(self):
         if self.isVertical:
@@ -416,6 +448,8 @@ class Scene:
         
         self.partitionMesh = None
         self.drawableFaces = []
+        
+        self.eventsRecord = []
         
     def createActiveSegments(self, index0, index1):
         v00 = self.vertices[self.prevIndices[index0]]
@@ -1039,17 +1073,21 @@ class Scene:
             heapq.heappush(q, lEnd)
             heapq.heappush(q, rEnd)
             
+        print("\nq preview:")
+        print(q[0:5])
+
         intersections = []  
         partitionMesh = HalfEdgeStructure()
     
         eventCount = 0
         
-            
         while len(q) > 0:
-            # print("\nEvents:", eventCount)
+            print("\nEvents:", eventCount)
             eventCount += 1
             p = heapq.heappop(q)
-            # print("Event: ", p)
+            print("Event: ", p)
+            
+            self.eventsRecord.append(p)
             
             # print("Intersections({0}):".format(len(intersections)))
             # for isec in intersections:

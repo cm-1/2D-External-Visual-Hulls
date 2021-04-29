@@ -27,6 +27,20 @@ def doubleFaceTest(f):
         v1 = he.headVertex.position
         print(" - F{0}, {1}->{2}".format(fIndex, v0, v1))
         print("-----")
+        
+        
+def checkEventEquality(w0, w1):
+    print("== Event check ==")
+    numEvents0 = len(w0.eventsRecord)
+    numEvents1 = len(w1.eventsRecord)
+    if numEvents0 != numEvents1:
+        print("NUMBER OF EVENT RECORDS DIFFERENT! w0: {0}, w1: {1}".format(numEvents0, numEvents1))
+    minEvents = min(numEvents0, numEvents1)
+    for i in range(minEvents):
+        eventsEq = w0.eventsRecord[i].debugEq(w1.eventsRecord[i])
+        if not np.all(list(eventsEq.values())):
+            print(" - DIFF AT {0}: {1}".format(i, eventsEq))
+    print("Done event check!\n")
 #%%
 
 def drawScene(scene):
@@ -36,6 +50,9 @@ def drawScene(scene):
         x,y = obj.getSeparateXYs()
         plt.fill(x,y, "#A0A0A0") # light grey fill
         plt.plot(x,y, "#505050") # dark grey edges/outline
+        
+    plt.show()
+    return
     '''
     for ln in scene.lines:
         p0, p1 = scene.sceneBorderHitPoints(ln)
@@ -114,6 +131,8 @@ world7 = Scene()
 world8 = Scene()
 world9 = Scene()
 world10 = Scene()
+world11 = Scene()
+world12 = Scene()
 
 # These are the tris from Petitjean's diagram
 polygon1 = [(0, 0), (2.25, 0.5), (1.25, 2.3)] # [(0,3),(1,1),(3,0),(4,0),(3,4)]
@@ -195,6 +214,21 @@ polygon2 = [(-1.0, 1.0108875036239624), (1.0, 1.010890007019043), (1.0, 1.373540
 world10.addPolygon(polygon2)
 world10.addPolygon(polygon1)
 
+polygon0 = [(0.734870970249176, -1.1526894569396973), (-0.045375000685453415, 1.1651400327682495), (-0.8234530091285706, -0.9953095316886902), (-0.14182999730110168, -1.1985864639282227)]
+polygon1 = [(2.1045942306518555, -2.0704498291015625), (2.1045916080474854, 1.9576737880706787), (1.7419415712356567, 1.9576740264892578), (1.7419381141662598, -2.0704498291015625)]
+polygon2 = [(-1.7419382333755493, -2.0704498291015625), (-1.741940975189209, 1.9576740264892578), (-2.10459041595459, 1.9576740264892578), (-2.1045944690704346, -2.0704495906829834)]
+
+world11.addPolygon(polygon0)
+world11.addPolygon(polygon1)
+world11.addPolygon(polygon2)
+
+polygon0 = [(0.7000000476837158, -1.2000000476837158), (-0.10000000149011612, 1.2000000476837158), (-0.800000011920929, -1.0), (-0.10000000149011612, -1.25)]
+polygon1 = [(2.0999999046325684, -2.0999999046325684), (2.0999999046325684, 1.899999976158142), (1.7000000476837158, 1.899999976158142), (1.7000000476837158, -2.0999999046325684)]
+polygon2 = [(-1.7000000476837158, -2.0999999046325684), (-1.7000000476837158, 1.899999976158142), (-2.1000001430511475, 1.899999976158142), (-2.1000001430511475, -2.0999999046325684)]
+
+world12.addPolygon(polygon0)
+world12.addPolygon(polygon1)
+world12.addPolygon(polygon2)
 #world.addLine((0, 2.5), (3, 2.5))
 
 worlds = [world0, world1, world2, world3, world4, world5, world6, world7, world8, world9, world10]
@@ -210,6 +244,7 @@ for w in worlds:
     for k in faceList:
         doubleFaceTest(faceList[k])
 
+checkEventEquality(world12, world11)
 
 
 
