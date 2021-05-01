@@ -235,7 +235,9 @@ class MyLine:
             self.b = p0[1] - self.m * p0[0]
         
         # Normalized direction vec from p0 to p1
-        self.dir = (self.p1 - self.p0)/self.length
+        self.dir = self.p1 - self.p0
+        if self.length > 0:
+            self.dir = self.dir/self.length
         
     def __repr__(self):
         return "({0}->{1}), isSegment: {2}".format(self.p0, self.p1, self.isSegment)
@@ -940,17 +942,7 @@ class Scene:
         for f in self.partitionMesh.faces.values():
             if self.partitionMesh.isExteriorFace(f):
                 continue
-            #he = f.halfEdge
-            #if he.headVertex is None:
-            #    continue
-            '''v = he.headVertex.position
-            origHE = he
-            he = he.next
-            while he != origHE:
-                #if he.headVertex is None:
-                #    break
-                v = he.headVertex.position
-                he = he.next'''
+
             self.drawableFaces.append(f)
         
         print("Num of drawable faces:", len(self.drawableFaces))
@@ -1080,8 +1072,8 @@ class Scene:
             heapq.heappush(q, lEnd)
             heapq.heappush(q, rEnd)
             
-        print("\nq preview:")
-        print(q[0:5])
+        #print("\nq preview:")
+        #print(q[0:5])
 
         intersections = []  
         partitionMesh = HalfEdgeStructure()
@@ -1089,10 +1081,10 @@ class Scene:
         eventCount = 0
         
         while len(q) > 0:
-            print("\nEvents:", eventCount)
+            #print("\nEvents:", eventCount)
             eventCount += 1
             p = heapq.heappop(q)
-            print("Event: ", p)
+            #print("Event: ", p)
             
             self.eventsRecord.append(p)
             
