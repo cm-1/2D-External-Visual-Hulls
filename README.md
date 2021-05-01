@@ -1,5 +1,20 @@
 # 2D External Visual Hulls in Python
 
+## Running this code
+
+To use this code, you will first need a python environment with the following dependencies available:
+
+ * matplotlib
+ * numpy
+
+Running the file graphingVisHullTwoD.py will output the results of partitioning a scene of multiple polygons into separate visual regions. The original polygons will have a light-grey outline. Visual numbers are colour coded so that black is 0, red is 1, green is 2, blue is 3, etc. The black regions therefore form the visual hull.
+
+To test your own shape, simply create your own Scene() object in the same way that the existing world1, world2, etc. are created in the middle of the graphinvVisHullTwoD.py file right now. I plan to, in the future, make this more interactive or to take in a .txt file as input, so that this is slightly more convenient.
+
+When testing this out, I recommend you add multiple polygons to your world/scene, as the visual hull of a single 2D polygon is just its convex hull, which isn't particularly interesting compared to what happens with multiple polygons!
+
+## Background
+
 Implementing an algorithm for creation of 2D external visual hulls in Python, as preparation for creating 3D ones in a Blender plugin.
 
 I hope to provide a better overview of this in a future README, but for now, I'm just going to quickly copy-paste and edit something I'd written about them in a different context:
@@ -12,7 +27,6 @@ If someone reading this wants to look these up for themselves, then in addition 
 
 ## TODO for this README:
  * Add in images of what a visual hull "removes" versus what it keeps compared to a convex hull.
- * Talk about dependencies (possibly after removing Shapely)
 
 ## Citations:
 
