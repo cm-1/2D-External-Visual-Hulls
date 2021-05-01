@@ -1080,8 +1080,8 @@ class Scene:
             heapq.heappush(q, lEnd)
             heapq.heappush(q, rEnd)
             
-        print("\nq preview:")
-        print(q[0:5])
+        #print("\nq preview:")
+        #print(q[0:5])
 
         intersections = []  
         partitionMesh = HalfEdgeStructure()
@@ -1089,10 +1089,10 @@ class Scene:
         eventCount = 0
         
         while len(q) > 0:
-            print("\nEvents:", eventCount)
+            #print("\nEvents:", eventCount)
             eventCount += 1
             p = heapq.heappop(q)
-            print("Event: ", p)
+            #print("Event: ", p)
             
             self.eventsRecord.append(p)
             
