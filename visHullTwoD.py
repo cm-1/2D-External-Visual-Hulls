@@ -4,7 +4,7 @@ from enum import Enum
 from collections import deque
 import heapq
 
-from rbt import RedBlackTree # REALLY NEED TO REWRITE THIS!
+from RedBlackTree.rb_tree import RedBlackTree
 
 EQUAL_THRESHOLD = 0.001 # Threshold for considering certain fp numbers equal below.
 EQUAL_DECIMAL_PLACES = -round(math.log(EQUAL_THRESHOLD, 10))
@@ -1082,10 +1082,10 @@ class Scene:
         eventCount = 0
         
         while len(q) > 0:
-            print("\nEvents:", eventCount)
+            #print("\nEvents:", eventCount)
             eventCount += 1
             p = heapq.heappop(q)
-            print("Event: ", p)
+            #print("Event: ", p)
             
             self.eventsRecord.append(p)
             

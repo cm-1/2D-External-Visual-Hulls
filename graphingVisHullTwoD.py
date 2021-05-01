@@ -51,8 +51,6 @@ def drawScene(scene):
         plt.fill(x,y, "#A0A0A0") # light grey fill
         plt.plot(x,y, "#505050") # dark grey edges/outline
         
-    plt.show()
-    return
     '''
     for ln in scene.lines:
         p0, p1 = scene.sceneBorderHitPoints(ln)
@@ -253,8 +251,8 @@ reminders = [
      "Is there a better way, using cos(), to handle parallelism in isLineInsideEdgeAngle()?",
      "Pruning of lines that intersect obj at CONTACT verts. (I sort of forget what this self-reminder meant...)",
      "Pruning of segments outside convex hull.",
-     "Replace RB Tree with my own, or one with better licensing!"
      "Right now, swapDir() side effect in findIntersections(). Should this be changed?",
+     "Just generally take a second look at how floating-point precision problems are handled.\nEspecially for the y-intercept of MyLine, since a very small difference in coordinates can lead to a larger difference in y-intercepts.\nSo instead of comparing y-intercepts, something else should maybe be compared!"
 ]
 
 for reminder in reminders:
