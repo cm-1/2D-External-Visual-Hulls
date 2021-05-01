@@ -2,7 +2,16 @@
 
 ## Running this code
 
-To use this code, you will first need a python environment with the following dependencies available:
+To run this code, you have two options: (1) Google Colab, and (2) running locally. For simply trying out the code to test the drawing of visual hulls, I definitely recommend the Colab option, as no setup is required.
+
+### Google Colab Option
+
+Simply sign in to your Google account and follow the commands in the Google Colab.
+
+Link: https://colab.research.google.com/drive/1SJI4j3K4ffWpb7IzOsVleMtXp_6popic?usp=sharing
+
+### Local Running Option
+To use this code locally, you will first need a python environment with the following dependencies available:
 
  * matplotlib
  * numpy
