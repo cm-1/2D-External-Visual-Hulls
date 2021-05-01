@@ -450,6 +450,12 @@ class Scene:
         self.drawableFaces = []
         
         self.eventsRecord = []
+
+    def resetVisHullCalcs(self):
+        self.activeSegments = []
+        self.partitionMesh = None
+        self.drawableFaces = []
+        self.eventsRecord = []
         
     def createActiveSegments(self, index0, index1):
         v00 = self.vertices[self.prevIndices[index0]]
@@ -585,6 +591,7 @@ class Scene:
         self.lines.append(MyLine(p0, p1, False))
         
     def calcFreeLines(self):
+        self.resetVisHullCalcs()
         vertLineDict = {}
         nonVertLineDict = {}
         for i in range(len(self.vertices) - 1):
