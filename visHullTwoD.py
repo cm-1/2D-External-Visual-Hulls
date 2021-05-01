@@ -1082,10 +1082,10 @@ class Scene:
         eventCount = 0
         
         while len(q) > 0:
-            #print("\nEvents:", eventCount)
+            print("\nEvents:", eventCount)
             eventCount += 1
             p = heapq.heappop(q)
-            #print("Event: ", p)
+            print("Event: ", p)
             
             self.eventsRecord.append(p)
             
